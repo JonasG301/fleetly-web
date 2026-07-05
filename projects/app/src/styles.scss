@@ -1,0 +1,42 @@
+// fleetly Theme — Farbwelt aus der Flutter-App:
+// Primär-Grün #4E944F, Akzent-Braun #8D775F, Hintergrund #F6F5F2
+@use '@angular/material' as mat;
+
+html {
+  @include mat.theme(
+    (
+      color: (
+        primary: mat.$green-palette,
+        tertiary: mat.$orange-palette,
+      ),
+      typography: Roboto,
+      density: 0,
+    )
+  );
+
+  // Fleetly-Markenfarben überschreiben die generierten M3-Rollen
+  --mat-sys-primary: #4e944f;
+  --mat-sys-on-primary: #ffffff;
+  --mat-sys-primary-container: #d3ecd0;
+  --mat-sys-on-primary-container: #123214;
+  --mat-sys-tertiary: #8d775f;
+  --mat-sys-on-tertiary: #ffffff;
+  --mat-sys-surface: #f6f5f2;
+}
+
+body {
+  color-scheme: light;
+  background-color: var(--mat-sys-surface);
+  color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-body-medium);
+  margin: 0;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  font-family: Roboto, 'Helvetica Neue', sans-serif;
+}
