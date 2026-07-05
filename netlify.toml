@@ -1,0 +1,11 @@
+# fleetly-web — Netlify Build-Konfiguration (statisches Angular-SPA, kein SSR)
+
+[build]
+  command = "node scripts/set-env.mjs && npx ng build app --configuration production"
+  publish = "dist/app/browser"
+
+# SPA-Fallback: alle Routen auf index.html
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
