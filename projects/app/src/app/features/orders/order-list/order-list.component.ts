@@ -22,8 +22,11 @@ import { OrderWithVehicles, OrdersService } from '../orders.service';
 import { OrderFormComponent } from '../order-form/order-form.component';
 import { OrderPipelineComponent } from '../order-pipeline/order-pipeline.component';
 
+<<<<<<< HEAD
 const VIEW_STORAGE_KEY = 'fleetly.orders.view';
 
+=======
+>>>>>>> origin/master
 /** Auftragsübersicht mit Filtern nach Kunde/Status und Suche (US-09). */
 @Component({
   selector: 'app-order-list',
@@ -217,11 +220,14 @@ export class OrderListComponent {
   readonly statusFilter = signal<OrderStatus | null>(null);
   readonly loadError = signal<string | null>(null);
 
+<<<<<<< HEAD
   /** Ansicht (Tabelle oder Pipeline), Wahl überlebt den Reload (US-09). */
   readonly view = signal<'table' | 'pipeline'>(
     localStorage.getItem(VIEW_STORAGE_KEY) === 'pipeline' ? 'pipeline' : 'table',
   );
 
+=======
+>>>>>>> origin/master
   readonly filtered = computed(() => {
     const term = this.search().trim().toLowerCase();
     const customer = this.customerFilter();
@@ -291,6 +297,7 @@ export class OrderListComponent {
     this.openForm(order);
   }
 
+<<<<<<< HEAD
   setView(view: 'table' | 'pipeline'): void {
     this.view.set(view);
     localStorage.setItem(VIEW_STORAGE_KEY, view);
@@ -302,6 +309,8 @@ export class OrderListComponent {
     }
   }
 
+=======
+>>>>>>> origin/master
   openForm(order: OrderWithVehicles | null): void {
     this.dialog.open(OrderFormComponent, { data: order });
   }

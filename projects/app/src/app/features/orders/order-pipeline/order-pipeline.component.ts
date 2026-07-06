@@ -50,7 +50,11 @@ import { OrderWithVehicles, OrdersService } from '../orders.service';
                 <div class="card-head">
                   <span class="order-number">{{ o.order_number }}</span>
                   @if (auth.isAdmin() && o.status !== 'done') {
+<<<<<<< HEAD
                     <mat-icon class="drag-hint">drag_indicator</mat-icon>
+=======
+                    <mat-icon class="drag-hint" cdkDragHandle>drag_indicator</mat-icon>
+>>>>>>> origin/master
                   }
                 </div>
                 <div class="customer">{{ customerName(o) }}</div>
