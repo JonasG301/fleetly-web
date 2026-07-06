@@ -27,12 +27,12 @@ import { MatIconModule } from '@angular/material/icon';
       gap: 12px;
       padding: 14px 16px;
       margin: 12px 0;
-      background: #fdecea;
-      color: #611a15;
+      background: color-mix(in srgb, var(--hugo-status-critical) 15%, var(--hugo-paper));
+      color: var(--hugo-status-critical);
       border-radius: 8px;
     }
     .load-error mat-icon:first-child {
-      color: #c62828;
+      color: var(--hugo-status-critical);
     }
     .load-error span {
       flex: 1;

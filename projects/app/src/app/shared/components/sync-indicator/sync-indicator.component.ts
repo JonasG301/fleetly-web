@@ -45,13 +45,13 @@ import { SyncService } from '../../../core/services/sync.service';
       border-radius: 16px;
     }
     .online {
-      color: #2e7d32;
-      background: rgba(46, 125, 50, 0.12);
+      color: var(--hugo-status-ok);
+      background: color-mix(in srgb, var(--hugo-status-ok) 12%, var(--hugo-paper));
     }
     .pending,
     .offline {
-      color: #e65100;
-      background: rgba(230, 81, 0, 0.12);
+      color: var(--hugo-status-warn);
+      background: color-mix(in srgb, var(--hugo-status-warn) 12%, var(--hugo-paper));
     }
     mat-icon {
       font-size: 18px;

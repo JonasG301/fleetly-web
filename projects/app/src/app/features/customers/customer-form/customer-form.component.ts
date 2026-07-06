@@ -75,7 +75,7 @@ import { CustomersService } from '../customers.service';
       padding-top: 8px;
     }
     .warning {
-      color: #e65100;
+      color: var(--hugo-status-warn);
       font-size: 13px;
       margin: -4px 0 8px;
     }

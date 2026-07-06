@@ -182,7 +182,7 @@ function timeRangeValidator(group: AbstractControl): ValidationErrors | null {
       width: 100%;
     }
     .form-error {
-      color: #c62828;
+      color: var(--hugo-status-critical);
       font-size: 13px;
       margin: -8px 0 8px;
     }

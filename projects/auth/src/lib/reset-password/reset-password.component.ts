@@ -143,7 +143,7 @@ function passwordsMatch(group: AbstractControl): ValidationErrors | null {
       margin-bottom: 16px;
     }
     .mismatch-error {
-      color: #ba1a1a;
+      color: var(--hugo-status-critical);
       font-size: 12px;
       margin: -4px 0 12px;
     }
@@ -155,7 +155,7 @@ function passwordsMatch(group: AbstractControl): ValidationErrors | null {
       gap: 8px;
     }
     .invalid-hint mat-icon {
-      color: #ba1a1a;
+      color: var(--hugo-status-critical);
       font-size: 40px;
       width: 40px;
       height: 40px;

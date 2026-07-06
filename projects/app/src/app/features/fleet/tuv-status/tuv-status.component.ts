@@ -1,11 +1,11 @@
 import { DatePipe } from '@angular/common';
 import { Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatTableModule } from '@angular/material/table';
 import { Vehicle } from '../../../core/models/vehicle.model';
+import { LicensePlateComponent } from '../../../shared/components/license-plate/license-plate.component';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { TuvStatusChipComponent } from '../../../shared/components/status-chip/tuv-status-chip.component';
 import { FleetService } from '../fleet.service';
@@ -16,46 +16,46 @@ interface TuvRow {
   info: TuvInfo;
 }
 
-/** TÜV-Übersicht: alle aktiven Fahrzeuge nach Fälligkeit sortiert, mit Ampel-Statistik. */
+/** HU-Übersicht: alle aktiven Fahrzeuge nach Fälligkeit sortiert, mit Ampel-Statistik. */
 @Component({
   selector: 'app-tuv-status',
   imports: [
     DatePipe,
     RouterLink,
-    MatCardModule,
     MatIconModule,
     MatTableModule,
     MatProgressBarModule,
     PageHeaderComponent,
     TuvStatusChipComponent,
+    LicensePlateComponent,
   ],
   template: `
-    <app-page-header title="TÜV-Status" subtitle="Hauptuntersuchungen aller aktiven Fahrzeuge" />
+    <app-page-header title="HU-Status" subtitle="Hauptuntersuchungen aller aktiven Fahrzeuge" />
 
     <div class="stats">
-      <mat-card class="stat expired">
-        <span class="count">{{ stats().expired }}</span>
-        <span>Abgelaufen</span>
-      </mat-card>
-      <mat-card class="stat due7">
-        <span class="count">{{ stats().due7 }}</span>
-        <span>≤ 7 Tage</span>
-      </mat-card>
-      <mat-card class="stat due30">
-        <span class="count">{{ stats().due30 }}</span>
-        <span>≤ 30 Tage</span>
-      </mat-card>
-      <mat-card class="stat valid">
-        <span class="count">{{ stats().valid }}</span>
-        <span>Gültig</span>
-      </mat-card>
+      <div class="stat expired">
+        <span class="count hugo-stat">{{ stats().expired }}</span>
+        <span class="stat-label">Abgelaufen</span>
+      </div>
+      <div class="stat due7">
+        <span class="count hugo-stat">{{ stats().due7 }}</span>
+        <span class="stat-label">≤ 7 Tage</span>
+      </div>
+      <div class="stat due30">
+        <span class="count hugo-stat">{{ stats().due30 }}</span>
+        <span class="stat-label">≤ 30 Tage</span>
+      </div>
+      <div class="stat valid">
+        <span class="count hugo-stat">{{ stats().valid }}</span>
+        <span class="stat-label">Gültig</span>
+      </div>
     </div>
 
     @if (fleet.loading()) {
       <mat-progress-bar mode="indeterminate" />
     }
 
-    <table mat-table [dataSource]="rows()" class="mat-elevation-z1">
+    <table mat-table [dataSource]="rows()">
       <ng-container matColumnDef="status">
         <th mat-header-cell *matHeaderCellDef>Status</th>
         <td mat-cell *matCellDef="let r">
@@ -65,7 +65,9 @@ interface TuvRow {
       <ng-container matColumnDef="plate">
         <th mat-header-cell *matHeaderCellDef>Kennzeichen</th>
         <td mat-cell *matCellDef="let r">
-          <a [routerLink]="['/fuhrpark', r.vehicle.id]" class="plate-link">{{ r.vehicle.plate }}</a>
+          <a [routerLink]="['/fuhrpark', r.vehicle.id]" class="plate-link">
+            <app-license-plate [plate]="r.vehicle.plate" size="sm" />
+          </a>
         </td>
       </ng-container>
       <ng-container matColumnDef="vehicle">
@@ -74,7 +76,7 @@ interface TuvRow {
       </ng-container>
       <ng-container matColumnDef="lastTuv">
         <th mat-header-cell *matHeaderCellDef>Letzte HU</th>
-        <td mat-cell *matCellDef="let r">
+        <td mat-cell *matCellDef="let r" class="hugo-numeric">
           {{ r.vehicle.tuv_date ? (r.vehicle.tuv_date | date: 'dd.MM.yyyy') : '–' }}
         </td>
       </ng-container>
@@ -86,7 +88,7 @@ interface TuvRow {
       </ng-container>
       <ng-container matColumnDef="dueMonth">
         <th mat-header-cell *matHeaderCellDef>Fälligkeitsmonat</th>
-        <td mat-cell *matCellDef="let r">{{ r.info.dueMonthLabel ?? '–' }}</td>
+        <td mat-cell *matCellDef="let r" class="hugo-numeric">{{ r.info.dueMonthLabel ?? '–' }}</td>
       </ng-container>
       <tr mat-header-row *matHeaderRowDef="columns"></tr>
       <tr mat-row *matRowDef="let row; columns: columns"></tr>
@@ -97,30 +99,36 @@ interface TuvRow {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
       gap: 12px;
-      margin-bottom: 20px;
+      margin-bottom: 24px;
     }
     .stat {
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 16px;
+      padding: 16px 8px;
       gap: 4px;
+      border-top: 1px solid var(--hugo-hairline);
     }
-    .count {
-      font-size: 32px;
-      font-weight: 700;
+    .stat-label {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      color: var(--hugo-ink-muted);
     }
-    .expired .count { color: #c62828; }
-    .due7 .count { color: #e65100; }
-    .due30 .count { color: #f9a825; }
-    .valid .count { color: #2e7d32; }
+    .expired .count { color: var(--hugo-status-critical); }
+    .due7 .count { color: var(--hugo-status-critical); }
+    .due30 .count { color: var(--hugo-status-warn); }
+    .valid .count { color: var(--hugo-status-ok); }
     table {
       width: 100%;
-      background: white;
+      background: transparent;
+    }
+    ::ng-deep table .mat-mdc-header-row,
+    ::ng-deep table .mat-mdc-row {
+      border-bottom-color: var(--hugo-hairline);
     }
     .plate-link {
-      font-weight: 600;
-      color: #35683a;
+      display: inline-flex;
       text-decoration: none;
     }
   `,

@@ -1,15 +1,14 @@
 import { Component } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { MatIconModule } from '@angular/material/icon';
 
 @Component({
   selector: 'app-auth-layout',
-  imports: [RouterOutlet, MatIconModule],
+  imports: [RouterOutlet],
   template: `
     <div class="auth-container">
       <div class="branding">
-        <mat-icon class="brand-icon">agriculture</mat-icon>
-        <h1>fleetly</h1>
+        <h1><span class="accent">HU</span>GO</h1>
+        <p class="tagline">HU · UVV · Geräte · Organisation</p>
         <p>Fuhrpark & Zeiterfassung für moderne Landwirtschaft</p>
       </div>
       <router-outlet />
@@ -24,25 +23,31 @@ import { MatIconModule } from '@angular/material/icon';
       justify-content: center;
       gap: 24px;
       padding: 16px;
-      background: #f6f5f2;
+      background: var(--hugo-paper);
     }
     .branding {
       text-align: center;
-      color: #4e944f;
-    }
-    .brand-icon {
-      font-size: 56px;
-      width: 56px;
-      height: 56px;
+      color: var(--hugo-ink);
     }
     h1 {
-      margin: 8px 0 4px;
-      font-size: 32px;
+      margin: 0 0 4px;
+      font-size: 36px;
       font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    h1 .accent {
+      color: var(--hugo-accent);
+    }
+    .tagline {
+      margin: 0 0 8px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      color: var(--hugo-ink-muted);
     }
     p {
       margin: 0;
-      color: rgba(0, 0, 0, 0.6);
+      color: var(--hugo-ink-muted);
     }
   `,
 })

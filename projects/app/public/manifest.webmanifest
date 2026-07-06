@@ -1,6 +1,6 @@
 {
-  "name": "app",
-  "short_name": "app",
+  "name": "HUGO",
+  "short_name": "HUGO",
   "display": "standalone",
   "scope": "./",
   "start_url": "./",

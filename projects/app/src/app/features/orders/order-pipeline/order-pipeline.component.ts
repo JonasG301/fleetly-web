@@ -90,18 +90,18 @@ import { OrderWithVehicles, OrdersService } from '../orders.service';
       }
     }
     .column {
-      background: #f5f5f5;
+      background: color-mix(in srgb, var(--hugo-ink) 5%, var(--hugo-paper));
       border-radius: 8px;
       border-top: 4px solid transparent;
     }
     .column-open {
-      border-top-color: #1565c0;
+      border-top-color: var(--hugo-status-unknown);
     }
     .column-in_progress {
-      border-top-color: #e65100;
+      border-top-color: var(--hugo-status-warn);
     }
     .column-done {
-      border-top-color: #2e7d32;
+      border-top-color: var(--hugo-status-ok);
     }
     .column-header {
       display: flex;
@@ -115,7 +115,7 @@ import { OrderWithVehicles, OrdersService } from '../orders.service';
     .column-count {
       font-size: 12px;
       font-weight: 600;
-      background: rgba(0, 0, 0, 0.08);
+      background: color-mix(in srgb, var(--hugo-ink) 8%, transparent);
       border-radius: 12px;
       padding: 2px 8px;
     }
@@ -127,14 +127,14 @@ import { OrderWithVehicles, OrdersService } from '../orders.service';
       min-height: 80px;
     }
     .card {
-      background: white;
+      background: var(--hugo-paper);
+      border: 1px solid var(--hugo-hairline);
       border-radius: 6px;
       padding: 10px 12px;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
       cursor: pointer;
     }
     .card.cdk-drag-preview {
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 4px 12px color-mix(in srgb, var(--hugo-ink) 30%, transparent);
     }
     .card.cdk-drag-placeholder {
       opacity: 0.3;
@@ -148,16 +148,16 @@ import { OrderWithVehicles, OrdersService } from '../orders.service';
       font-weight: 600;
     }
     .drag-hint {
-      color: rgba(0, 0, 0, 0.3);
+      color: var(--hugo-ink-muted);
       cursor: grab;
     }
     .customer {
       font-size: 13px;
-      color: rgba(0, 0, 0, 0.7);
+      color: var(--hugo-ink-muted);
     }
     .description {
       font-size: 13px;
-      color: rgba(0, 0, 0, 0.55);
+      color: var(--hugo-ink-muted);
       margin-top: 4px;
       display: -webkit-box;
       -webkit-line-clamp: 2;
@@ -169,13 +169,13 @@ import { OrderWithVehicles, OrdersService } from '../orders.service';
       align-items: center;
       gap: 4px;
       font-size: 12px;
-      color: rgba(0, 0, 0, 0.55);
+      color: var(--hugo-ink-muted);
       margin-top: 6px;
     }
     .column-empty {
       text-align: center;
       font-size: 13px;
-      color: rgba(0, 0, 0, 0.4);
+      color: var(--hugo-ink-muted);
       margin: 16px 0;
     }
   `,

@@ -61,13 +61,13 @@ export const TUV_STATUS_LABELS: Record<TuvStatus, string> = {
   unknown: 'Kein Datum',
 };
 
-/** Farbwelt analog Flutter: rot / orange / amber / grün / grau */
-export const TUV_STATUS_COLORS: Record<TuvStatus, string> = {
-  expired: '#c62828',
-  due_7: '#e65100',
-  due_30: '#f9a825',
-  valid: '#2e7d32',
-  unknown: '#9e9e9e',
+/** Ampel-Ebene über HUGO-Statustokens (--hugo-status-*), siehe styles.scss. */
+export const TUV_STATUS_TOKENS: Record<TuvStatus, string> = {
+  expired: '--hugo-status-critical',
+  due_7: '--hugo-status-critical',
+  due_30: '--hugo-status-warn',
+  valid: '--hugo-status-ok',
+  unknown: '--hugo-status-unknown',
 };
 
 /** Sortierschlüssel: Abgelaufene zuerst, dann nach Restlaufzeit. */

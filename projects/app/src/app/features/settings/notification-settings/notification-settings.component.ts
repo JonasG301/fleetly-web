@@ -67,7 +67,7 @@ interface NotificationSettingsRow {
           </mat-slide-toggle>
 
           <mat-slide-toggle formControlName="tuv_reminders_enabled">
-            TÜV-Erinnerungen erhalten (30/7/1 Tage vor Fälligkeit)
+            HU-Erinnerungen erhalten (30/7/1 Tage vor Fälligkeit)
           </mat-slide-toggle>
 
           <div class="actions">
@@ -122,7 +122,7 @@ interface NotificationSettingsRow {
       margin-top: 16px;
     }
     .hint {
-      color: rgba(0, 0, 0, 0.6);
+      color: var(--hugo-ink-muted);
       font-size: 13px;
     }
     .actions {

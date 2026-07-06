@@ -71,7 +71,7 @@ import { SupabaseService } from '../../../core/services/supabase.service';
   `,
   styles: `
     .hint {
-      color: rgba(0, 0, 0, 0.6);
+      color: var(--hugo-ink-muted);
       font-size: 13px;
       margin-bottom: 12px;
     }
@@ -206,7 +206,7 @@ export class InviteUserDialogComponent {
       width: 160px;
     }
     .empty {
-      color: rgba(0, 0, 0, 0.6);
+      color: var(--hugo-ink-muted);
       text-align: center;
       padding: 24px 0;
     }
@@ -215,7 +215,7 @@ export class InviteUserDialogComponent {
       align-items: center;
       gap: 12px;
       padding: 16px 0;
-      color: #ba1a1a;
+      color: var(--hugo-status-critical);
     }
   `,
 })

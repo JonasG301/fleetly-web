@@ -38,7 +38,7 @@ export interface ConfirmDialogData {
   `,
   styles: `
     .destructive {
-      --mat-button-filled-container-color: #c62828;
+      --mat-button-filled-container-color: var(--hugo-status-critical);
     }
   `,
 })

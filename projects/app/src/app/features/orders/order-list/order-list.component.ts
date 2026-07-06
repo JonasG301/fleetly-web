@@ -167,7 +167,7 @@ const VIEW_STORAGE_KEY = 'fleetly.orders.view';
     }
     table {
       width: 100%;
-      background: white;
+      background: transparent;
     }
     .order-number {
       font-weight: 600;
@@ -179,23 +179,23 @@ const VIEW_STORAGE_KEY = 'fleetly.orders.view';
       border-radius: 12px;
     }
     .status-open {
-      background: #e3f2fd;
-      color: #1565c0;
+      background: color-mix(in srgb, var(--hugo-status-unknown) 18%, var(--hugo-paper));
+      color: var(--hugo-status-unknown);
     }
     .status-in_progress {
-      background: #fff3e0;
-      color: #e65100;
+      background: color-mix(in srgb, var(--hugo-status-warn) 18%, var(--hugo-paper));
+      color: var(--hugo-status-warn);
     }
     .status-done {
-      background: #e8f5e9;
-      color: #2e7d32;
+      background: color-mix(in srgb, var(--hugo-status-ok) 18%, var(--hugo-paper));
+      color: var(--hugo-status-ok);
     }
     .actions {
       text-align: right;
     }
     .empty {
       text-align: center;
-      color: rgba(0, 0, 0, 0.5);
+      color: var(--hugo-ink-muted);
       padding: 32px;
     }
   `,

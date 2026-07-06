@@ -13,6 +13,7 @@ import { AuthService } from 'auth';
 import { Customer } from '../../../core/models/customer.model';
 import { Vehicle } from '../../../core/models/vehicle.model';
 import { LoadErrorComponent } from '../../../shared/components/load-error/load-error.component';
+import { LicensePlateComponent } from '../../../shared/components/license-plate/license-plate.component';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { TuvStatusChipComponent } from '../../../shared/components/status-chip/tuv-status-chip.component';
 import { CustomersService } from '../../customers/customers.service';
@@ -24,7 +25,7 @@ interface VehicleRow extends Vehicle {
   customerName: string | null;
 }
 
-/** Fahrzeugliste mit Tabs „Eigener Fuhrpark | Kundenfahrzeuge" und TÜV-Spalte (US-06, US-07). */
+/** Fahrzeugliste mit Tabs „Eigener Fuhrpark | Kundenfahrzeuge" und HU-Spalte (US-06, US-07). */
 @Component({
   selector: 'app-vehicle-list',
   imports: [
@@ -40,13 +41,14 @@ interface VehicleRow extends Vehicle {
     MatProgressBarModule,
     PageHeaderComponent,
     TuvStatusChipComponent,
+    LicensePlateComponent,
     LoadErrorComponent,
   ],
   template: `
-    <app-page-header title="Fuhrpark" subtitle="Fahrzeuge verwalten und TÜV im Blick behalten">
+    <app-page-header title="Fuhrpark" subtitle="Fahrzeuge verwalten und HU im Blick behalten">
       <button matButton routerLink="/fuhrpark/tuv">
         <mat-icon>verified</mat-icon>
-        TÜV-Status
+        HU-Status
       </button>
       @if (auth.isAdmin()) {
         <button matButton="filled" routerLink="/fuhrpark/neu">
@@ -55,6 +57,21 @@ interface VehicleRow extends Vehicle {
         </button>
       }
     </app-page-header>
+
+    <div class="stat-row">
+      <div class="stat">
+        <span class="stat-value hugo-stat">{{ ownRows().length }}</span>
+        <span class="stat-label">Eigener Fuhrpark</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value hugo-stat">{{ customerRows().length }}</span>
+        <span class="stat-label">Kundenfahrzeuge</span>
+      </div>
+      <div class="stat" [class.alert]="dueCount() > 0">
+        <span class="stat-value hugo-stat">{{ dueCount() }}</span>
+        <span class="stat-label">HU fällig (≤30 Tage)</span>
+      </div>
+    </div>
 
     <div class="filter-row">
       <mat-form-field appearance="outline" class="search">
@@ -96,7 +113,9 @@ interface VehicleRow extends Vehicle {
         <ng-container matColumnDef="plate">
           <th mat-header-cell *matHeaderCellDef>Kennzeichen</th>
           <td mat-cell *matCellDef="let v">
-            <a [routerLink]="['/fuhrpark', v.id]" class="plate-link">{{ v.plate }}</a>
+            <a [routerLink]="['/fuhrpark', v.id]" class="plate-link">
+              <app-license-plate [plate]="v.plate" size="sm" />
+            </a>
             @if (!v.is_active) {
               <span class="inactive">inaktiv</span>
             }
@@ -116,7 +135,7 @@ interface VehicleRow extends Vehicle {
           <td mat-cell *matCellDef="let v">{{ v.customerName ?? '–' }}</td>
         </ng-container>
         <ng-container matColumnDef="tuv">
-          <th mat-header-cell *matHeaderCellDef>TÜV</th>
+          <th mat-header-cell *matHeaderCellDef>HU</th>
           <td mat-cell *matCellDef="let v">
             <app-tuv-status-chip [info]="v.tuvInfo" />
           </td>
@@ -141,11 +160,34 @@ interface VehicleRow extends Vehicle {
     </ng-template>
   `,
   styles: `
+    .stat-row {
+      display: flex;
+      gap: 32px;
+      flex-wrap: wrap;
+      margin: 4px 0 24px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--hugo-hairline);
+    }
+    .stat {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .stat-label {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      color: var(--hugo-ink-muted);
+    }
+    .stat.alert .stat-value {
+      color: var(--hugo-status-critical);
+    }
     .filter-row {
       display: flex;
       gap: 16px;
       align-items: center;
       flex-wrap: wrap;
+      margin-bottom: 16px;
     }
     .search {
       width: 100%;
@@ -156,25 +198,25 @@ interface VehicleRow extends Vehicle {
     }
     table {
       width: 100%;
-      background: white;
+      background: transparent;
+    }
+    ::ng-deep table .mat-mdc-header-row,
+    ::ng-deep table .mat-mdc-row {
+      border-bottom-color: var(--hugo-hairline);
     }
     .plate-link {
-      font-weight: 600;
-      color: #35683a;
+      display: inline-flex;
       text-decoration: none;
     }
-    .plate-link:hover {
-      text-decoration: underline;
-    }
     .internal {
-      color: rgba(0, 0, 0, 0.5);
+      color: var(--hugo-ink-muted);
       font-size: 13px;
     }
     .inactive {
       font-size: 11px;
-      color: #9e9e9e;
-      border: 1px solid #bdbdbd;
-      border-radius: 10px;
+      color: var(--hugo-ink-muted);
+      border: 1px solid var(--hugo-hairline);
+      border-radius: var(--hugo-radius-control);
       padding: 1px 6px;
       margin-left: 6px;
     }
@@ -183,7 +225,7 @@ interface VehicleRow extends Vehicle {
     }
     .empty {
       text-align: center;
-      color: rgba(0, 0, 0, 0.5);
+      color: var(--hugo-ink-muted);
       padding: 32px;
     }
   `,
@@ -211,6 +253,12 @@ export class VehicleListComponent {
 
   readonly ownRows = computed(() => this.toRows(this.fleet.ownFleet()));
   readonly customerRows = computed(() => this.toRows(this.fleet.customerVehicles()));
+  readonly dueCount = computed(
+    () =>
+      [...this.ownRows(), ...this.customerRows()].filter((v) =>
+        v.tuvInfo.status === 'expired' || v.tuvInfo.status === 'due_7' || v.tuvInfo.status === 'due_30',
+      ).length,
+  );
 
   constructor() {
     void this.load();

@@ -130,13 +130,13 @@ import { AuthService } from '../auth.service';
       display: flex;
       gap: 12px;
       align-items: flex-start;
-      background: #fff8e1;
-      border-radius: 8px;
+      background: color-mix(in srgb, var(--hugo-status-warn, #a9791e) 12%, transparent);
+      border-radius: var(--hugo-radius-control, 12px);
       padding: 12px;
       margin-bottom: 12px;
     }
     .confirm-hint mat-icon {
-      color: #f9a825;
+      color: var(--hugo-status-warn, #a9791e);
       flex-shrink: 0;
     }
     .confirm-hint p {

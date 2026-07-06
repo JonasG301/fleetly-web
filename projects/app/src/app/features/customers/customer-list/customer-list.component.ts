@@ -102,7 +102,7 @@ import { CustomerFormComponent } from '../customer-form/customer-form.component'
     }
     table {
       width: 100%;
-      background: white;
+      background: transparent;
       border-radius: 8px;
       overflow: hidden;
     }
@@ -112,15 +112,15 @@ import { CustomerFormComponent } from '../customer-form/customer-form.component'
     }
     .inactive {
       font-size: 11px;
-      color: #9e9e9e;
-      border: 1px solid #bdbdbd;
+      color: var(--hugo-status-unknown);
+      border: 1px solid var(--hugo-hairline);
       border-radius: 10px;
       padding: 1px 6px;
       margin-left: 6px;
     }
     .empty {
       text-align: center;
-      color: rgba(0, 0, 0, 0.5);
+      color: var(--hugo-ink-muted);
       padding: 32px;
     }
   `,

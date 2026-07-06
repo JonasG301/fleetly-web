@@ -112,7 +112,7 @@ import { ReportsService } from '../reports.service';
       flex: 1;
     }
     .cancel-entry {
-      color: #c62828;
+      color: var(--hugo-status-critical);
     }
     .spacer {
       flex: 1;

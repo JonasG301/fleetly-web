@@ -144,10 +144,10 @@ import { ActiveStamp, StampService } from './stamp.service';
       gap: 16px;
     }
     .stamp-card {
-      border-left: 4px solid #4e944f;
+      border-left: 4px solid var(--hugo-status-ok);
     }
     .stamp-card.paused {
-      border-left-color: #e65100;
+      border-left-color: var(--hugo-status-warn);
     }
     .stamp-info {
       display: flex;
@@ -160,17 +160,17 @@ import { ActiveStamp, StampService } from './stamp.service';
     .details,
     .since {
       font-size: 13px;
-      color: rgba(0, 0, 0, 0.6);
+      color: var(--hugo-ink-muted);
     }
     .timer {
       font-size: 36px;
       font-weight: 700;
       font-variant-numeric: tabular-nums;
-      color: #4e944f;
+      color: var(--hugo-status-ok);
       margin: 12px 0;
     }
     .timer.paused {
-      color: #e65100;
+      color: var(--hugo-status-warn);
     }
     .pause-hint {
       font-size: 13px;
@@ -182,7 +182,7 @@ import { ActiveStamp, StampService } from './stamp.service';
       gap: 8px;
     }
     .stop-btn {
-      --mat-button-filled-container-color: #c62828;
+      --mat-button-filled-container-color: var(--hugo-status-critical);
     }
   `,
 })

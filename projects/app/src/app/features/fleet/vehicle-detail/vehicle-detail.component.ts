@@ -13,6 +13,7 @@ import { DAMAGE_STATUS_LABELS, DamageReport } from '../../../core/models/damage-
 import { FUEL_TYPE_LABELS } from '../../../core/models/vehicle.model';
 import { ServiceEntry } from '../../../core/models/service-entry.model';
 import { confirmDialog } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
+import { LicensePlateComponent } from '../../../shared/components/license-plate/license-plate.component';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { TuvStatusChipComponent } from '../../../shared/components/status-chip/tuv-status-chip.component';
 import { CustomersService } from '../../customers/customers.service';
@@ -35,10 +36,14 @@ import { calcTuvInfo } from '../tuv-status/tuv.utils';
     MatSlideToggleModule,
     PageHeaderComponent,
     TuvStatusChipComponent,
+    LicensePlateComponent,
   ],
   template: `
     @if (vehicle(); as v) {
-      <app-page-header [title]="v.plate" [subtitle]="v.make + ' ' + v.model">
+      <header class="plate-header">
+        <app-license-plate [plate]="v.plate" size="lg" />
+      </header>
+      <app-page-header [title]="v.make + ' ' + v.model" [subtitle]="v.internal_name ?? undefined">
         @if (auth.isAdmin()) {
           <mat-slide-toggle
             [checked]="v.is_active"
@@ -56,7 +61,7 @@ import { calcTuvInfo } from '../tuv-status/tuv.utils';
       <div class="detail-grid">
         <mat-card>
           <mat-card-header>
-            <mat-card-title>TÜV & Prüfungen</mat-card-title>
+            <mat-card-title>HU & Prüfungen</mat-card-title>
           </mat-card-header>
           <mat-card-content>
             <app-tuv-status-chip [info]="tuvInfo()" />
@@ -95,6 +100,8 @@ import { calcTuvInfo } from '../tuv-status/tuv.utils';
               <dd>{{ v.vin ?? '–' }}</dd>
               <dt>Kostenstelle</dt>
               <dd>{{ v.cost_center ?? '–' }}</dd>
+              <dt>Leasing-Ende</dt>
+              <dd>{{ v.leasing_end ? (v.leasing_end | date: 'dd.MM.yyyy') : '–' }}</dd>
             </dl>
             @if (v.notes) {
               <p class="notes">{{ v.notes }}</p>
@@ -173,6 +180,9 @@ import { calcTuvInfo } from '../tuv-status/tuv.utils';
     }
   `,
   styles: `
+    .plate-header {
+      margin-bottom: 12px;
+    }
     .detail-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
@@ -192,7 +202,7 @@ import { calcTuvInfo } from '../tuv-status/tuv.utils';
       margin: 12px 0 0;
     }
     dt {
-      color: rgba(0, 0, 0, 0.55);
+      color: var(--hugo-ink-muted);
       font-size: 13px;
     }
     dd {
@@ -202,10 +212,10 @@ import { calcTuvInfo } from '../tuv-status/tuv.utils';
     .notes {
       margin-top: 12px;
       white-space: pre-wrap;
-      color: rgba(0, 0, 0, 0.7);
+      color: var(--hugo-ink-muted);
     }
     .empty {
-      color: rgba(0, 0, 0, 0.5);
+      color: var(--hugo-ink-muted);
       font-size: 13px;
     }
   `,

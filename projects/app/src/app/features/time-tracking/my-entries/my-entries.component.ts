@@ -129,11 +129,11 @@ import { OrdersService } from '../../orders/orders.service';
     }
     table {
       width: 100%;
-      background: white;
+      background: transparent;
     }
     .empty {
       text-align: center;
-      color: rgba(0, 0, 0, 0.5);
+      color: var(--hugo-ink-muted);
       padding: 32px;
     }
   `,

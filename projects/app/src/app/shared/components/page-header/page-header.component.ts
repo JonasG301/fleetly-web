@@ -31,7 +31,7 @@ import { Component, input } from '@angular/core';
     }
     .subtitle {
       margin: 4px 0 0;
-      color: rgba(0, 0, 0, 0.6);
+      color: var(--hugo-ink-muted);
       font-size: 14px;
     }
     .actions {

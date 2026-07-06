@@ -24,7 +24,7 @@ import { FleetService } from '../fleet.service';
 
 /**
  * Fahrzeug anlegen/bearbeiten als Stepper (US-06) — Schritte analog
- * zum Flutter-Wizard: Basisdaten / Technik & TÜV / Sonstiges.
+ * zum Flutter-Wizard: Basisdaten / Technik & HU / Sonstiges.
  */
 @Component({
   selector: 'app-vehicle-form',
@@ -81,7 +81,7 @@ import { FleetService } from '../fleet.service';
             </mat-select>
           </mat-form-field>
           <mat-checkbox formControlName="is_faster_than_40kmh">
-            Fahrzeug schneller als 40 km/h (TÜV-Intervall 1 Jahr statt 2 Jahre)
+            Fahrzeug schneller als 40 km/h (HU-Intervall 1 Jahr statt 2 Jahre)
           </mat-checkbox>
           <div>
             <button matButton="filled" matStepperNext type="button">Weiter</button>
@@ -89,8 +89,8 @@ import { FleetService } from '../fleet.service';
         </form>
       </mat-step>
 
-      <!-- Schritt 2: Technik & TÜV -->
-      <mat-step [stepControl]="techForm" label="Technik & TÜV">
+      <!-- Schritt 2: Technik & HU -->
+      <mat-step [stepControl]="techForm" label="Technik & HU">
         <form [formGroup]="techForm" class="step-form">
           <mat-form-field appearance="outline">
             <mat-label>Betriebsstunden</mat-label>
@@ -110,7 +110,7 @@ import { FleetService } from '../fleet.service';
             }
           </mat-form-field>
           <mat-form-field appearance="outline">
-            <mat-label>Letzte HU (TÜV)</mat-label>
+            <mat-label>Letzte HU</mat-label>
             <input matInput [matDatepicker]="tuvPicker" formControlName="tuv_date" />
             <mat-datepicker-toggle matIconSuffix [for]="tuvPicker" />
             <mat-datepicker #tuvPicker />
@@ -147,6 +147,12 @@ import { FleetService } from '../fleet.service';
           <mat-form-field appearance="outline">
             <mat-label>Kostenstelle</mat-label>
             <input matInput formControlName="cost_center" />
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Leasing-Ende</mat-label>
+            <input matInput [matDatepicker]="leasingEndPicker" formControlName="leasing_end" />
+            <mat-datepicker-toggle matIconSuffix [for]="leasingEndPicker" />
+            <mat-datepicker #leasingEndPicker />
           </mat-form-field>
           <mat-form-field appearance="outline" class="notes">
             <mat-label>Notizen</mat-label>
@@ -224,6 +230,7 @@ export class VehicleFormComponent implements HasUnsavedChanges {
 
   readonly miscForm = this.fb.group({
     cost_center: [''],
+    leasing_end: [null as Date | null],
     notes: [''],
   });
 
@@ -261,7 +268,11 @@ export class VehicleFormComponent implements HasUnsavedChanges {
       fuel_type: v.fuel_type,
       vin: v.vin ?? '',
     });
-    this.miscForm.patchValue({ cost_center: v.cost_center ?? '', notes: v.notes ?? '' });
+    this.miscForm.patchValue({
+      cost_center: v.cost_center ?? '',
+      leasing_end: v.leasing_end ? new Date(v.leasing_end) : null,
+      notes: v.notes ?? '',
+    });
   }
 
   async save(): Promise<void> {
@@ -288,6 +299,7 @@ export class VehicleFormComponent implements HasUnsavedChanges {
       fuel_type: tech.fuel_type,
       vin: tech.vin?.trim() || null,
       cost_center: misc.cost_center?.trim() || null,
+      leasing_end: toIsoDate(misc.leasing_end),
       notes: misc.notes?.trim() || null,
     };
     try {

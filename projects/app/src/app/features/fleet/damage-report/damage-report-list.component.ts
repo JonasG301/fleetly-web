@@ -159,17 +159,17 @@ import { DamageReportService } from './damage-report.service';
       flex-direction: column;
       gap: 2px;
       font-size: 13px;
-      color: rgba(0, 0, 0, 0.6);
+      color: var(--hugo-ink-muted);
       min-width: 110px;
     }
     .stat .count {
       font-size: 24px;
       font-weight: 700;
     }
-    .stat.open .count { color: #c62828; }
-    .stat.in_repair .count { color: #e65100; }
-    .stat.resolved .count { color: #2e7d32; }
-    .stat.total .count { color: #37474f; }
+    .stat.open .count { color: var(--hugo-status-critical); }
+    .stat.in_repair .count { color: var(--hugo-status-warn); }
+    .stat.resolved .count { color: var(--hugo-status-ok); }
+    .stat.total .count { color: var(--hugo-ink); }
     .by-vehicle {
       padding: 16px 20px;
       margin-bottom: 16px;
@@ -180,7 +180,7 @@ import { DamageReportService } from './damage-report.service';
     .by-vehicle-title {
       font-size: 13px;
       font-weight: 600;
-      color: rgba(0, 0, 0, 0.6);
+      color: var(--hugo-ink-muted);
       margin-bottom: 4px;
     }
     .bar-row {
@@ -196,14 +196,14 @@ import { DamageReportService } from './damage-report.service';
     .bar-track {
       flex: 1;
       height: 14px;
-      background: #eceff1;
+      background: color-mix(in srgb, var(--hugo-ink) 8%, var(--hugo-paper));
       border-radius: 7px;
       overflow: hidden;
     }
     .bar-fill {
       display: block;
       height: 100%;
-      background: #c62828;
+      background: var(--hugo-status-critical);
       border-radius: 7px;
     }
     .bar-value {
@@ -218,11 +218,11 @@ import { DamageReportService } from './damage-report.service';
     }
     table {
       width: 100%;
-      background: white;
+      background: transparent;
     }
     .empty {
       text-align: center;
-      color: rgba(0, 0, 0, 0.5);
+      color: var(--hugo-ink-muted);
       padding: 32px;
     }
     .status-btn {

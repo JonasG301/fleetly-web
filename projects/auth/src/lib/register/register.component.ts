@@ -213,7 +213,7 @@ function passwordsMatch(group: AbstractControl): ValidationErrors | null {
       margin-bottom: 16px;
     }
     .mismatch-error {
-      color: #ba1a1a;
+      color: var(--hugo-status-critical);
       font-size: 12px;
       margin: -4px 0 12px;
     }
@@ -229,7 +229,7 @@ function passwordsMatch(group: AbstractControl): ValidationErrors | null {
       font-size: 48px;
       width: 48px;
       height: 48px;
-      color: #4e944f;
+      color: var(--hugo-status-ok);
     }
     .success h2 {
       margin: 0;
@@ -237,7 +237,7 @@ function passwordsMatch(group: AbstractControl): ValidationErrors | null {
     }
     .success p {
       margin: 0 0 8px;
-      color: rgba(0, 0, 0, 0.6);
+      color: var(--hugo-ink-muted);
     }
   `,
 })

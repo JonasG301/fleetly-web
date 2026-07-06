@@ -238,12 +238,12 @@ import { ReportsService } from '../reports.service';
       flex-direction: column;
       gap: 2px;
       font-size: 13px;
-      color: rgba(0, 0, 0, 0.6);
+      color: var(--hugo-ink-muted);
     }
     .sum-value {
       font-size: 22px;
       font-weight: 700;
-      color: #4e944f;
+      color: var(--hugo-status-ok);
     }
     .breakdowns {
       display: grid;
@@ -260,7 +260,7 @@ import { ReportsService } from '../reports.service';
     .breakdown-title {
       font-size: 13px;
       font-weight: 600;
-      color: rgba(0, 0, 0, 0.6);
+      color: var(--hugo-ink-muted);
       margin-bottom: 4px;
     }
     .bar-row {
@@ -279,18 +279,18 @@ import { ReportsService } from '../reports.service';
     .bar-track {
       flex: 1;
       height: 12px;
-      background: #eceff1;
+      background: color-mix(in srgb, var(--hugo-ink) 8%, var(--hugo-paper));
       border-radius: 6px;
       overflow: hidden;
     }
     .bar-fill {
       display: block;
       height: 100%;
-      background: #4e944f;
+      background: var(--hugo-status-ok);
       border-radius: 6px;
     }
     .bar-fill.month {
-      background: #8d775f;
+      background: var(--hugo-ink-muted);
     }
     .bar-value {
       width: 64px;
@@ -303,19 +303,19 @@ import { ReportsService } from '../reports.service';
     }
     table {
       width: 100%;
-      background: white;
+      background: transparent;
     }
     .running {
       font-size: 11px;
       font-weight: 600;
-      color: #e65100;
-      background: #fff3e0;
+      color: var(--hugo-status-warn);
+      background: color-mix(in srgb, var(--hugo-status-warn) 18%, var(--hugo-paper));
       border-radius: 10px;
       padding: 1px 8px;
       margin-left: 6px;
     }
     .note-icon {
-      color: #8d775f;
+      color: var(--hugo-ink-muted);
       font-size: 18px;
     }
     .actions {
@@ -323,7 +323,7 @@ import { ReportsService } from '../reports.service';
     }
     .empty {
       text-align: center;
-      color: rgba(0, 0, 0, 0.5);
+      color: var(--hugo-ink-muted);
       padding: 32px;
     }
   `,

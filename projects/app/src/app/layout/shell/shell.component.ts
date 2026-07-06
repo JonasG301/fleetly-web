@@ -1,5 +1,5 @@
 import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
-import { Component, inject } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
@@ -7,9 +7,23 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatListModule } from '@angular/material/list';
 import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatToolbarModule } from '@angular/material/toolbar';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { AuthService } from 'auth';
 import { map } from 'rxjs';
+import { ThemeMode, ThemeService } from '../../core/services/theme.service';
 import { SyncIndicatorComponent } from '../../shared/components/sync-indicator/sync-indicator.component';
+
+const THEME_ICONS: Record<ThemeMode, string> = {
+  system: 'brightness_auto',
+  light: 'light_mode',
+  dark: 'dark_mode',
+};
+
+const THEME_LABELS: Record<ThemeMode, string> = {
+  system: 'Darstellung: System',
+  light: 'Darstellung: Hell',
+  dark: 'Darstellung: Dunkel',
+};
 
 interface NavItem {
   label: string;
@@ -42,6 +56,7 @@ const NAV_ITEMS: NavItem[] = [
     MatListModule,
     MatIconModule,
     MatButtonModule,
+    MatTooltipModule,
     SyncIndicatorComponent,
   ],
   template: `
@@ -53,8 +68,7 @@ const NAV_ITEMS: NavItem[] = [
         class="sidenav"
       >
         <div class="logo">
-          <mat-icon>agriculture</mat-icon>
-          <span>fleetly</span>
+          <span class="wordmark"><span class="accent">HU</span>GO</span>
         </div>
         <mat-nav-list>
           @for (item of navItems(); track item.route) {
@@ -81,6 +95,14 @@ const NAV_ITEMS: NavItem[] = [
           }
           <span class="spacer"></span>
           <app-sync-indicator />
+          <button
+            matIconButton
+            (click)="theme.cycle()"
+            [attr.aria-label]="themeLabel()"
+            [matTooltip]="themeLabel()"
+          >
+            <mat-icon>{{ themeIcon() }}</mat-icon>
+          </button>
           <span class="user-name">{{ auth.user()?.fullName }}</span>
           <button matIconButton (click)="logout()" aria-label="Abmelden" title="Abmelden">
             <mat-icon>logout</mat-icon>
@@ -95,24 +117,36 @@ const NAV_ITEMS: NavItem[] = [
   styles: `
     .shell-container {
       height: 100vh;
+      --mat-sidenav-content-background-color: var(--hugo-paper);
+      --mat-sidenav-content-text-color: var(--hugo-ink);
     }
     .sidenav {
       width: 240px;
+      --mat-sidenav-container-background-color: var(--hugo-paper);
+      --mat-sidenav-container-text-color: var(--hugo-ink);
+      border-right: 1px solid var(--hugo-hairline);
     }
     .logo {
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 20px 16px;
+      padding: 24px 16px;
+    }
+    .wordmark {
       font-size: 22px;
       font-weight: 700;
-      color: #4e944f;
+      letter-spacing: -0.02em;
+      color: var(--hugo-ink);
+    }
+    .wordmark .accent {
+      color: var(--hugo-accent);
     }
     .toolbar {
       display: flex;
       gap: 12px;
-      background: #4e944f;
-      color: white;
+      --mat-toolbar-container-background-color: var(--hugo-paper);
+      --mat-toolbar-container-text-color: var(--hugo-ink);
+      border-bottom: 1px solid var(--hugo-hairline);
       position: sticky;
       top: 0;
       z-index: 10;
@@ -130,14 +164,15 @@ const NAV_ITEMS: NavItem[] = [
       margin: 0 auto;
     }
     .active-link {
-      --mat-list-list-item-container-color: rgba(78, 148, 79, 0.14);
-      --mat-list-list-item-leading-icon-color: #4e944f;
-      --mat-list-list-item-label-text-color: #35683a;
+      --mat-list-list-item-container-color: color-mix(in srgb, var(--hugo-accent) 14%, transparent);
+      --mat-list-list-item-leading-icon-color: var(--hugo-accent);
+      --mat-list-list-item-label-text-color: var(--hugo-accent);
     }
   `,
 })
 export class ShellComponent {
   readonly auth = inject(AuthService);
+  readonly theme = inject(ThemeService);
   private readonly router = inject(Router);
   private readonly breakpoints = inject(BreakpointObserver);
 
@@ -145,6 +180,9 @@ export class ShellComponent {
     this.breakpoints.observe(Breakpoints.Handset).pipe(map((r) => r.matches)),
     { initialValue: false },
   );
+
+  readonly themeIcon = computed(() => THEME_ICONS[this.theme.mode()]);
+  readonly themeLabel = computed(() => THEME_LABELS[this.theme.mode()]);
 
   navItems(): NavItem[] {
     return NAV_ITEMS.filter((item) => !item.adminOnly || this.auth.isAdmin());

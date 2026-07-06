@@ -1,33 +1,213 @@
-// fleetly Theme — Farbwelt aus der Flutter-App:
-// Primär-Grün #4E944F, Akzent-Braun #8D775F, Hintergrund #F6F5F2
+// HUGO Design-System "Systematik" mit dezenter Werkbank-Note:
+// nüchterne, dichte Flächen (Hairlines statt Cards, große Kennzahlen, tabellarische Zahlen),
+// aber warme Papierfarbe statt Reinweiß und ein einziger Arbeitsgrün-Akzent statt Schwarz-Weiß-Strenge.
 @use '@angular/material' as mat;
 
 html {
+  // theme-type: light fixiert das Farbschema fest auf hell — ohne diese Angabe generiert
+  // mat.theme() automatisch ein zweites, dunkles Schema nach prefers-color-scheme, das
+  // Sidenav/Karten unabhängig von unseren eigenen HUGO-Tokens umschaltet.
   @include mat.theme(
     (
       color: (
+        theme-type: light,
         primary: mat.$green-palette,
-        tertiary: mat.$orange-palette,
+        tertiary: mat.$green-palette,
       ),
       typography: Roboto,
       density: 0,
     )
   );
 
-  // Fleetly-Markenfarben überschreiben die generierten M3-Rollen
-  --mat-sys-primary: #4e944f;
-  --mat-sys-on-primary: #ffffff;
+  // HUGO-Tokens — überschreiben die generierten M3-Rollen
+  --hugo-paper: #f7f1e3;
+  --hugo-ink: #20241d;
+  --hugo-ink-muted: #716f63;
+  --hugo-hairline: #d9d6c8;
+  --hugo-accent: #2a5c3c;
+  --hugo-accent-on: #ffffff;
+  --hugo-status-ok: #2a5c3c;
+  --hugo-status-warn: #a9791e;
+  --hugo-status-critical: #a5382a;
+  --hugo-status-unknown: #9a9787;
+  --hugo-radius-control: 12px;
+  --hugo-radius-control-lg: 14px;
+  --hugo-radius-plate: 4px;
+
+  --mat-sys-primary: var(--hugo-accent);
+  --mat-sys-on-primary: var(--hugo-accent-on);
   --mat-sys-primary-container: #d3ecd0;
   --mat-sys-on-primary-container: #123214;
-  --mat-sys-tertiary: #8d775f;
-  --mat-sys-on-tertiary: #ffffff;
-  --mat-sys-surface: #f6f5f2;
+  --mat-sys-tertiary: var(--hugo-accent);
+  --mat-sys-on-tertiary: var(--hugo-accent-on);
+  --mat-sys-surface: var(--hugo-paper);
+  --mat-sys-on-surface: var(--hugo-ink);
+  --mat-sys-outline: var(--hugo-hairline);
+  --mat-sys-corner-medium: var(--hugo-radius-control);
+  --mat-sys-corner-large: var(--hugo-radius-control-lg);
+
+  // Component-Level-Tokens: mat.theme() liefert nur die --mat-sys-*-Systemebene, nicht die
+  // einzelnen Komponenten-Tokens (Card, Dialog, Tabelle …) — die setzen wir global selbst,
+  // damit Cards/Dialoge die flache Papierfläche statt weißer Material-Default-Flächen zeigen.
+  @include mat.card-overrides(
+    (
+      elevated-container-color: var(--hugo-paper),
+      elevated-container-elevation: none,
+      outlined-container-color: var(--hugo-paper),
+      outlined-outline-color: var(--hugo-hairline),
+      subtitle-text-color: var(--hugo-ink-muted),
+    )
+  );
+  @include mat.dialog-overrides(
+    (
+      container-color: var(--hugo-paper),
+    )
+  );
+  @include mat.sidenav-overrides(
+    (
+      container-background-color: var(--hugo-paper),
+      container-text-color: var(--hugo-ink),
+      content-background-color: var(--hugo-paper),
+      content-text-color: var(--hugo-ink),
+    )
+  );
+  @include mat.toolbar-overrides(
+    (
+      container-background-color: var(--hugo-paper),
+      container-text-color: var(--hugo-ink),
+    )
+  );
+  @include mat.table-overrides(
+    (
+      background-color: var(--hugo-paper),
+      row-item-outline-color: var(--hugo-hairline),
+      header-headline-color: var(--hugo-ink-muted),
+      row-item-label-text-color: var(--hugo-ink),
+    )
+  );
+  // Dropdown-/Overlay-Panels: M3 setzt hierfür standardmäßig statische, zur Build-Zeit
+  // aus der (fest hell fixierten) Palette berechnete Farbrollen (z. B. surface-container),
+  // die NICHT automatisch mit den --hugo-*-Custom-Properties im Dark-Mode mitziehen —
+  // deshalb hier explizit auf die HUGO-Tokens gemappt.
+  @include mat.select-overrides(
+    (
+      panel-background-color: var(--hugo-paper),
+    )
+  );
+  @include mat.menu-overrides(
+    (
+      container-color: var(--hugo-paper),
+      item-label-text-color: var(--hugo-ink),
+      item-icon-color: var(--hugo-ink-muted),
+    )
+  );
+  @include mat.autocomplete-overrides(
+    (
+      background-color: var(--hugo-paper),
+    )
+  );
+  @include mat.datepicker-overrides(
+    (
+      calendar-container-background-color: var(--hugo-paper),
+      calendar-container-text-color: var(--hugo-ink),
+      calendar-body-label-text-color: var(--hugo-ink-muted),
+      calendar-header-text-color: var(--hugo-ink-muted),
+      calendar-date-text-color: var(--hugo-ink),
+      calendar-navigation-button-icon-color: var(--hugo-ink-muted),
+      calendar-period-button-icon-color: var(--hugo-ink-muted),
+      calendar-period-button-text-color: var(--hugo-ink),
+    )
+  );
+  @include mat.tooltip-overrides(
+    (
+      container-color: var(--hugo-ink),
+      supporting-text-color: var(--hugo-paper),
+    )
+  );
+  @include mat.snack-bar-overrides(
+    (
+      container-color: var(--hugo-ink),
+      supporting-text-color: var(--hugo-paper),
+    )
+  );
+  @include mat.checkbox-overrides(
+    (
+      label-text-color: var(--hugo-ink),
+      disabled-label-color: var(--hugo-ink-muted),
+      unselected-icon-color: var(--hugo-ink-muted),
+    )
+  );
+  @include mat.slide-toggle-overrides(
+    (
+      label-text-color: var(--hugo-ink),
+      disabled-label-text-color: var(--hugo-ink-muted),
+      unselected-handle-color: var(--hugo-ink-muted),
+      unselected-track-color: var(--hugo-hairline),
+      unselected-icon-color: var(--hugo-ink-muted),
+    )
+  );
+  @include mat.stepper-overrides(
+    (
+      container-color: var(--hugo-paper),
+      header-icon-background-color: var(--hugo-ink-muted),
+    )
+  );
+}
+
+mat-card {
+  border: 1px solid var(--hugo-hairline);
+}
+
+// Dark Mode: alle Feature-Seiten sind inzwischen durchgängig auf --hugo-*-Tokens umgestellt
+// (keine hartcodierten Weiß-/Schwarz-Werte mehr), daher genügt es, hier die Tokens auf
+// dunkle Werte umzuschalten — Component-Overrides oben ziehen automatisch mit.
+//
+// Zwei Wege dahin: automatisch nach Systemeinstellung (prefers-color-scheme), ODER manuell
+// über den Hell/Dunkel-Umschalter (ThemeService setzt dafür `data-theme` am html-Element).
+// Der manuelle Toggle hat immer Vorrang vor der Systemeinstellung.
+@mixin hugo-dark-tokens {
+  --hugo-paper: #1b1d16;
+  --hugo-ink: #edeae0;
+  --hugo-ink-muted: #a6a395;
+  --hugo-hairline: #34362a;
+  --hugo-accent: #6fbe86;
+  --hugo-accent-on: #10130d;
+  --hugo-status-ok: #6fbe86;
+  --hugo-status-warn: #d9af52;
+  --hugo-status-critical: #e28a78;
+  --hugo-status-unknown: #9a9787;
+
+  --mat-sys-primary-container: #1e3b26;
+  --mat-sys-on-primary-container: #d3ecd0;
+}
+
+@media (prefers-color-scheme: dark) {
+  // :not([data-theme='light']) lässt einen expliziten "Hell erzwingen"-Toggle die
+  // Systemeinstellung übersteuern.
+  html:not([data-theme='light']) {
+    @include hugo-dark-tokens;
+  }
+}
+
+html[data-theme='dark'] {
+  @include hugo-dark-tokens;
+}
+
+html {
+  color-scheme: light dark;
+}
+
+html[data-theme='light'] {
+  color-scheme: light;
+}
+
+html[data-theme='dark'] {
+  color-scheme: dark;
 }
 
 body {
-  color-scheme: light;
-  background-color: var(--mat-sys-surface);
-  color: var(--mat-sys-on-surface);
+  background-color: var(--hugo-paper);
+  color: var(--hugo-ink);
   font: var(--mat-sys-body-medium);
   margin: 0;
 }
@@ -39,4 +219,25 @@ body {
 
 body {
   font-family: Roboto, 'Helvetica Neue', sans-serif;
+}
+
+// Tabellarische Ziffern für alles Amtliche: Betriebsstunden, km, Termine, Beträge.
+.hugo-numeric {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+// Große Kennzahl im Systematik-Stil (Bestandszahlen, Statistik-Kacheln).
+.hugo-stat {
+  font-size: 40px;
+  line-height: 1.05;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+.hugo-hairline {
+  border: none;
+  border-top: 1px solid var(--hugo-hairline);
 }
