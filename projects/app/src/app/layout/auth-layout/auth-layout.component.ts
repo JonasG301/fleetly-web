@@ -9,7 +9,6 @@ import { RouterOutlet } from '@angular/router';
       <div class="branding">
         <h1><span class="accent">HU</span>GO</h1>
         <p class="tagline">HU · UVV · Geräte · Organisation</p>
-        <p>Fuhrpark & Zeiterfassung für moderne Landwirtschaft</p>
       </div>
       <router-outlet />
     </div>
