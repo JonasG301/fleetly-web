@@ -104,7 +104,19 @@ export class InviteUserDialogComponent {
     });
     this.sending.set(false);
     if (error || data?.error) {
-      this.snackBar.open('Einladung fehlgeschlagen: ' + (data?.error ?? error?.message), 'OK', {
+      // supabase-js liefert bei Non-2xx-Antworten `error.message` nur als generischen
+      // Platzhalter ("Edge Function returned a non-2xx status code"); der eigentliche
+      // Fehlertext steckt im Response-Body unter `error.context`.
+      let message = data?.error ?? error?.message;
+      if (!data?.error && error && 'context' in error) {
+        try {
+          const body = await (error as { context: Response }).context.json();
+          message = body?.error ?? message;
+        } catch {
+          /* Body war kein JSON – generische Meldung beibehalten. */
+        }
+      }
+      this.snackBar.open('Einladung fehlgeschlagen: ' + message, 'OK', {
         duration: 6000,
       });
       return;
