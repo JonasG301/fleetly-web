@@ -17,6 +17,7 @@ import { LicensePlateComponent } from '../../../shared/components/license-plate/
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { TuvStatusChipComponent } from '../../../shared/components/status-chip/tuv-status-chip.component';
 import { CustomersService } from '../../customers/customers.service';
+import { DamageReportPhotosDialogComponent } from '../damage-report/damage-report-photos-dialog.component';
 import { DamageReportService } from '../damage-report/damage-report.service';
 import { FleetService } from '../fleet.service';
 import { ServiceEntryDialogComponent } from '../service-history/service-entry-dialog.component';
@@ -169,8 +170,20 @@ import { calcTuvInfo } from '../tuv-status/tuv.utils';
                   <mat-icon matListItemIcon>report_problem</mat-icon>
                   <span matListItemTitle>{{ d.damage_date | date: 'dd.MM.yyyy' }} — {{ d.description }}</span>
                   <span matListItemLine>
-                    {{ d.location }} · gemeldet von {{ d.reporter_name }} · {{ statusLabels[d.status] }}
+                    @if (d.location) {
+                      {{ d.location }} ·
+                    }
+                    gemeldet von {{ d.reporter_name }} · {{ statusLabels[d.status] }}
                   </span>
+                  <button
+                    matIconButton
+                    matListItemMeta
+                    type="button"
+                    (click)="openDamagePhotos(d)"
+                    aria-label="Fotos ansehen"
+                  >
+                    <mat-icon>photo_camera</mat-icon>
+                  </button>
                 </mat-list-item>
               }
             </mat-list>
@@ -259,6 +272,10 @@ export class VehicleDetailComponent {
 
   private async reloadServiceEntries(): Promise<void> {
     this.serviceEntries.set(await this.fleet.loadServiceEntries(this.id()));
+  }
+
+  openDamagePhotos(d: DamageReport): void {
+    this.dialog.open(DamageReportPhotosDialogComponent, { data: d });
   }
 
   addServiceEntry(): void {

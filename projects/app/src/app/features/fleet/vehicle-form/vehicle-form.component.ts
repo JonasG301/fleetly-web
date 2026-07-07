@@ -15,6 +15,8 @@ import {
   FUEL_TYPE_LABELS,
   FuelType,
   LICENSE_PLATE_PATTERN,
+  VEHICLE_CATEGORIES,
+  VEHICLE_CATEGORY_LABELS,
   VehicleInsert,
 } from '../../../core/models/vehicle.model';
 import { HasUnsavedChanges } from '../../../core/guards/unsaved-changes.guard';
@@ -70,6 +72,15 @@ import { FleetService } from '../fleet.service';
           <mat-form-field appearance="outline">
             <mat-label>Interne Bezeichnung</mat-label>
             <input matInput formControlName="internal_name" />
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Fahrzeugtyp</mat-label>
+            <mat-select formControlName="type">
+              <mat-option value="">– Kein Typ –</mat-option>
+              @for (c of categories; track c) {
+                <mat-option [value]="c">{{ categoryLabels[c] }}</mat-option>
+              }
+            </mat-select>
           </mat-form-field>
           <mat-form-field appearance="outline">
             <mat-label>Zuordnung</mat-label>
@@ -202,6 +213,8 @@ export class VehicleFormComponent implements HasUnsavedChanges {
   readonly maxYear = new Date().getFullYear() + 1;
   readonly fuelTypes = Object.keys(FUEL_TYPE_LABELS) as FuelType[];
   readonly fuelTypeLabels = FUEL_TYPE_LABELS;
+  readonly categories = VEHICLE_CATEGORIES;
+  readonly categoryLabels = VEHICLE_CATEGORY_LABELS;
   readonly saving = signal(false);
   /** Nach erfolgreichem Speichern true — unterdrückt die Verwerfen-Rückfrage. */
   private readonly saved = signal(false);
@@ -211,6 +224,7 @@ export class VehicleFormComponent implements HasUnsavedChanges {
     make: ['', Validators.required],
     model: ['', Validators.required],
     internal_name: [''],
+    type: [''],
     customer_id: [null as string | null],
     is_faster_than_40kmh: [true],
   });
@@ -256,6 +270,7 @@ export class VehicleFormComponent implements HasUnsavedChanges {
       make: v.make,
       model: v.model,
       internal_name: v.internal_name ?? '',
+      type: v.type ?? '',
       customer_id: v.customer_id,
       is_faster_than_40kmh: v.is_faster_than_40kmh,
     });
@@ -289,6 +304,7 @@ export class VehicleFormComponent implements HasUnsavedChanges {
       make: base.make.trim(),
       model: base.model.trim(),
       internal_name: base.internal_name.trim() || null,
+      type: base.type || null,
       customer_id: base.customer_id,
       is_faster_than_40kmh: base.is_faster_than_40kmh,
       operating_hours: tech.operating_hours,
