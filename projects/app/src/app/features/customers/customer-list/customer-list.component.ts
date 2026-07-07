@@ -1,4 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -18,6 +19,7 @@ import { CustomerFormComponent } from '../customer-form/customer-form.component'
 @Component({
   selector: 'app-customer-list',
   imports: [
+    RouterLink,
     MatTableModule,
     MatButtonModule,
     MatIconModule,
@@ -54,7 +56,7 @@ import { CustomerFormComponent } from '../customer-form/customer-form.component'
         <ng-container matColumnDef="company_name">
           <th mat-header-cell *matHeaderCellDef>Firma</th>
           <td mat-cell *matCellDef="let c">
-            {{ c.company_name }}
+            <a [routerLink]="['/kunden', c.id]" class="company-link">{{ c.company_name }}</a>
             @if (!c.is_active) {
               <span class="inactive">inaktiv</span>
             }
@@ -117,6 +119,13 @@ import { CustomerFormComponent } from '../customer-form/customer-form.component'
       border-radius: 10px;
       padding: 1px 6px;
       margin-left: 6px;
+    }
+    .company-link {
+      color: inherit;
+      text-decoration: none;
+    }
+    .company-link:hover {
+      text-decoration: underline;
     }
     .empty {
       text-align: center;

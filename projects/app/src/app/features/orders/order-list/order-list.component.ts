@@ -1,5 +1,6 @@
 import { DatePipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatDialog } from '@angular/material/dialog';
@@ -29,6 +30,7 @@ const VIEW_STORAGE_KEY = 'fleetly.orders.view';
   selector: 'app-order-list',
   imports: [
     DatePipe,
+    RouterLink,
     MatTableModule,
     MatButtonModule,
     MatIconModule,
@@ -106,7 +108,9 @@ const VIEW_STORAGE_KEY = 'fleetly.orders.view';
     <table mat-table [dataSource]="filtered()" class="mat-elevation-z1">
       <ng-container matColumnDef="order_number">
         <th mat-header-cell *matHeaderCellDef>Nummer</th>
-        <td mat-cell *matCellDef="let o" class="order-number">{{ o.order_number }}</td>
+        <td mat-cell *matCellDef="let o" class="order-number">
+          <a [routerLink]="['/auftraege', o.id]">{{ o.order_number }}</a>
+        </td>
       </ng-container>
       <ng-container matColumnDef="customer">
         <th mat-header-cell *matHeaderCellDef>Kunde</th>
@@ -171,6 +175,13 @@ const VIEW_STORAGE_KEY = 'fleetly.orders.view';
     }
     .order-number {
       font-weight: 600;
+    }
+    .order-number a {
+      color: inherit;
+      text-decoration: none;
+    }
+    .order-number a:hover {
+      text-decoration: underline;
     }
     .status-badge {
       font-size: 12px;

@@ -28,6 +28,10 @@ export class CustomersService {
     }
   }
 
+  byId(id: string): Customer | undefined {
+    return this._customers().find((c) => c.id === id);
+  }
+
   /** Duplikat-Warnung (US-04): existiert bereits ein Kunde mit diesem Namen? */
   hasDuplicateName(companyName: string, excludeId?: string): boolean {
     const needle = companyName.trim().toLowerCase();

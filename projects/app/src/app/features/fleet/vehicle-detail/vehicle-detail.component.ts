@@ -11,12 +11,14 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { AuthService } from 'auth';
 import { DAMAGE_STATUS_LABELS, DamageReport } from '../../../core/models/damage-report.model';
 import { FUEL_TYPE_LABELS } from '../../../core/models/vehicle.model';
+import { ORDER_STATUS_LABELS } from '../../../core/models/order.model';
 import { ServiceEntry } from '../../../core/models/service-entry.model';
 import { confirmDialog } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { LicensePlateComponent } from '../../../shared/components/license-plate/license-plate.component';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { TuvStatusChipComponent } from '../../../shared/components/status-chip/tuv-status-chip.component';
 import { CustomersService } from '../../customers/customers.service';
+import { OrdersService } from '../../orders/orders.service';
 import { DamageReportPhotosDialogComponent } from '../damage-report/damage-report-photos-dialog.component';
 import { DamageReportService } from '../damage-report/damage-report.service';
 import { VehicleDamageOverviewComponent } from '../damage-report/vehicle-damage-overview.component';
@@ -157,6 +159,34 @@ import { calcTuvInfo } from '../tuv-status/tuv.utils';
 
         <mat-card>
           <mat-card-header>
+            <mat-card-title>Aufträge</mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            @if (orders().length === 0) {
+              <p class="empty">Keine Aufträge für dieses Fahrzeug.</p>
+            }
+            <mat-list>
+              @for (o of orders(); track o.id) {
+                <a [routerLink]="['/auftraege', o.id]" class="order-row">
+                  <mat-list-item lines="3">
+                    <mat-icon matListItemIcon>assignment</mat-icon>
+                    <span matListItemTitle>{{ o.order_number }} — {{ o.description ?? '–' }}</span>
+                    <span matListItemLine>
+                      {{ o.start_date ? (o.start_date | date: 'dd.MM.yy') : '–' }} –
+                      {{ o.end_date ? (o.end_date | date: 'dd.MM.yy') : 'offen' }}
+                      · <span class="status-badge" [class]="'status-' + o.status">{{
+                        orderStatusLabels[o.status]
+                      }}</span>
+                    </span>
+                  </mat-list-item>
+                </a>
+              }
+            </mat-list>
+          </mat-card-content>
+        </mat-card>
+
+        <mat-card>
+          <mat-card-header>
             <mat-card-title>Schadensmeldungen</mat-card-title>
             <button matIconButton routerLink="/schaeden/neu" [queryParams]="{ fahrzeug: v.id }" aria-label="Schaden melden">
               <mat-icon>add</mat-icon>
@@ -239,6 +269,28 @@ import { calcTuvInfo } from '../tuv-status/tuv.utils';
       color: var(--hugo-ink-muted);
       font-size: 13px;
     }
+    .order-row {
+      color: inherit;
+      text-decoration: none;
+    }
+    .status-badge {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 1px 8px;
+      border-radius: 10px;
+    }
+    .status-open {
+      background: color-mix(in srgb, var(--hugo-status-unknown) 18%, var(--hugo-paper));
+      color: var(--hugo-status-unknown);
+    }
+    .status-in_progress {
+      background: color-mix(in srgb, var(--hugo-status-warn) 18%, var(--hugo-paper));
+      color: var(--hugo-status-warn);
+    }
+    .status-done {
+      background: color-mix(in srgb, var(--hugo-status-ok) 18%, var(--hugo-paper));
+      color: var(--hugo-status-ok);
+    }
   `,
 })
 export class VehicleDetailComponent {
@@ -246,6 +298,7 @@ export class VehicleDetailComponent {
   readonly auth = inject(AuthService);
   private readonly customersService = inject(CustomersService);
   private readonly damageService = inject(DamageReportService);
+  private readonly ordersService = inject(OrdersService);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
 
@@ -253,6 +306,7 @@ export class VehicleDetailComponent {
 
   readonly fuelLabels = FUEL_TYPE_LABELS;
   readonly statusLabels = DAMAGE_STATUS_LABELS;
+  readonly orderStatusLabels = ORDER_STATUS_LABELS;
   readonly serviceEntries = signal<ServiceEntry[]>([]);
 
   readonly vehicle = computed(() => this.fleet.byId(this.id()));
@@ -270,11 +324,15 @@ export class VehicleDetailComponent {
   readonly damages = computed<DamageReport[]>(() =>
     this.damageService.reports().filter((d) => d.vehicle_id === this.id()),
   );
+  readonly orders = computed(() =>
+    this.ordersService.orders().filter((o) => o.vehicle_ids.includes(this.id())),
+  );
 
   constructor() {
     void this.fleet.load();
     void this.customersService.load();
     void this.damageService.load();
+    void this.ordersService.load();
     void this.reloadServiceEntries();
   }
 
