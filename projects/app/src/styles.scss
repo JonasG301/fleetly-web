@@ -2,6 +2,7 @@
 // nüchterne, dichte Flächen (Hairlines statt Cards, große Kennzahlen, tabellarische Zahlen),
 // aber warme Papierfarbe statt Reinweiß und ein einziger Arbeitsgrün-Akzent statt Schwarz-Weiß-Strenge.
 @use '@angular/material' as mat;
+@import '../../../node_modules/angular-calendar/css/angular-calendar.css';
 
 html {
   // theme-type: light fixiert das Farbschema fest auf hell — ohne diese Angabe generiert
@@ -240,4 +241,57 @@ body {
 .hugo-hairline {
   border: none;
   border-top: 1px solid var(--hugo-hairline);
+}
+
+// angular-calendar: Standard-Palette durch HUGO-Tokens ersetzen (Bibliothek liefert
+// nur fest verdrahtete Hex-Farben, keine CSS-Variablen — siehe angular-calendar.css).
+.cal-month-view {
+  background-color: var(--hugo-paper);
+  color: var(--hugo-ink);
+}
+.cal-month-view .cal-cell-row:hover,
+.cal-month-view .cal-cell-row .cal-cell:hover,
+.cal-month-view .cal-cell.cal-has-events.cal-open {
+  background-color: color-mix(in srgb, var(--hugo-ink) 4%, var(--hugo-paper));
+}
+.cal-month-view .cal-days,
+.cal-month-view .cal-day-cell:not(:last-child),
+.cal-month-view .cal-days .cal-cell-row {
+  border-color: var(--hugo-hairline);
+}
+.cal-month-view .cal-header .cal-cell {
+  color: var(--hugo-ink-muted);
+}
+.cal-month-view .cal-day-cell.cal-weekend .cal-day-number {
+  color: var(--hugo-ink-muted);
+}
+.cal-month-view .cal-day-cell.cal-today {
+  background-color: color-mix(in srgb, var(--hugo-accent) 12%, var(--hugo-paper));
+}
+.cal-month-view .cal-day-cell.cal-out-month .cal-day-number {
+  opacity: 0.4;
+}
+.cal-month-view .cal-event {
+  background-color: var(--hugo-accent);
+  border-color: var(--hugo-accent);
+  color: var(--hugo-accent-on);
+}
+.cal-month-view .cal-open-day-events {
+  background-color: var(--hugo-ink);
+  color: var(--hugo-paper);
+}
+// Kleine Bildschirme: Event-Punkte sind sonst zu klein zum Antippen (< 24px)
+// und die Labels laufen in den engen Zellen ineinander.
+@media (max-width: 600px) {
+  .cal-month-view .cal-day-cell {
+    min-height: 64px;
+  }
+  .cal-month-view .cal-event {
+    width: 14px;
+    height: 14px;
+  }
+  .cal-month-view .cal-event-title {
+    font-size: 11px;
+    line-height: 1.3;
+  }
 }

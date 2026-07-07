@@ -49,6 +49,10 @@ export const routes: Routes = [
         loadChildren: () => import('./features/orders/orders.routes').then((m) => m.routes),
       },
       {
+        path: 'kalender',
+        loadChildren: () => import('./features/calendar/calendar.routes').then((m) => m.routes),
+      },
+      {
         path: 'kommissionsnummern',
         canActivate: [adminGuard],
         loadChildren: () =>

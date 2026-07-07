@@ -40,6 +40,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Fuhrpark', icon: 'agriculture', route: '/fuhrpark' },
   { label: 'Schäden', icon: 'report_problem', route: '/schaeden' },
   { label: 'Aufträge', icon: 'assignment', route: '/auftraege' },
+  { label: 'Kalender', icon: 'calendar_month', route: '/kalender' },
   { label: 'Kommissionsnummern', icon: 'tag', route: '/kommissionsnummern', adminOnly: true },
   { label: 'Auswertung', icon: 'bar_chart', route: '/auswertung', adminOnly: true },
   { label: 'Einstellungen', icon: 'settings', route: '/einstellungen' },
