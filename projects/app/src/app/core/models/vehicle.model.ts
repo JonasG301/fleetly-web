@@ -21,6 +21,36 @@ export const FUEL_TYPE_LABELS: Record<FuelType, string> = {
   hydrogen: 'Wasserstoff',
 };
 
+/**
+ * Fahrzeugkategorie — steuert u. a. welches Schadens-Diagramm (Silhouette
+ * zum Markieren der Schadensposition) in der Schadensmeldung angezeigt wird.
+ * Wird im freien `type`-Textfeld auf dem Fahrzeug gespeichert.
+ */
+export type VehicleCategory =
+  | 'pkw'
+  | 'traktor'
+  | 'anhaenger'
+  | 'lkw'
+  | 'bagger'
+  | 'radlader'
+  | 'walze'
+  | 'stapler'
+  | 'sonstiges';
+
+export const VEHICLE_CATEGORY_LABELS: Record<VehicleCategory, string> = {
+  pkw: 'PKW',
+  traktor: 'Traktor',
+  anhaenger: 'Anhänger',
+  lkw: 'LKW / Transporter',
+  bagger: 'Bagger',
+  radlader: 'Radlader',
+  walze: 'Walze',
+  stapler: 'Stapler',
+  sonstiges: 'Sonstiges',
+};
+
+export const VEHICLE_CATEGORIES = Object.keys(VEHICLE_CATEGORY_LABELS) as VehicleCategory[];
+
 /** Deutsches Kennzeichen, z. B. "S-AB 1234" (aus der Flutter-App übernommen). */
 export const LICENSE_PLATE_PATTERN = /^[A-ZÄÖÜ]{1,3}-[A-Z]{1,2} \d{1,4}$/;
 

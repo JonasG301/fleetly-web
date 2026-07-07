@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCardModule } from '@angular/material/card';
+import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
@@ -17,6 +18,7 @@ import {
 import { LoadErrorComponent } from '../../../shared/components/load-error/load-error.component';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { FleetService } from '../fleet.service';
+import { DamageReportPhotosDialogComponent } from './damage-report-photos-dialog.component';
 import { DamageReportService } from './damage-report.service';
 
 @Component({
@@ -111,7 +113,7 @@ import { DamageReportService } from './damage-report.service';
       </ng-container>
       <ng-container matColumnDef="location">
         <th mat-header-cell *matHeaderCellDef>Ort</th>
-        <td mat-cell *matCellDef="let d">{{ d.location }}</td>
+        <td mat-cell *matCellDef="let d">{{ d.location || '–' }}</td>
       </ng-container>
       <ng-container matColumnDef="reporter">
         <th mat-header-cell *matHeaderCellDef>Gemeldet von</th>
@@ -135,6 +137,14 @@ import { DamageReportService } from './damage-report.service';
           } @else {
             {{ statusLabel(d) }}
           }
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="photos">
+        <th mat-header-cell *matHeaderCellDef>Fotos</th>
+        <td mat-cell *matCellDef="let d">
+          <button matIconButton type="button" (click)="openPhotos(d)" aria-label="Fotos ansehen">
+            <mat-icon>photo_camera</mat-icon>
+          </button>
         </td>
       </ng-container>
       <tr mat-header-row *matHeaderRowDef="columns"></tr>
@@ -234,8 +244,17 @@ export class DamageReportListComponent {
   readonly service = inject(DamageReportService);
   readonly auth = inject(AuthService);
   private readonly fleet = inject(FleetService);
+  private readonly dialog = inject(MatDialog);
 
-  readonly columns = ['damage_date', 'vehicle', 'description', 'location', 'reporter', 'status'];
+  readonly columns = [
+    'damage_date',
+    'vehicle',
+    'description',
+    'location',
+    'reporter',
+    'status',
+    'photos',
+  ];
   readonly statuses: DamageStatus[] = ['open', 'in_repair', 'resolved'];
   readonly statusLabels = DAMAGE_STATUS_LABELS;
   readonly statusFilter = signal<DamageStatus | 'all'>('open');
@@ -293,5 +312,9 @@ export class DamageReportListComponent {
 
   statusLabel(d: DamageReport): string {
     return DAMAGE_STATUS_LABELS[d.status];
+  }
+
+  openPhotos(d: DamageReport): void {
+    this.dialog.open(DamageReportPhotosDialogComponent, { data: d });
   }
 }
