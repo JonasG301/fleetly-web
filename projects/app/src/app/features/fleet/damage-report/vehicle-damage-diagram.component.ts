@@ -51,6 +51,15 @@ const FALLBACK_LABEL = 'sonstiges';
 const svgMarkupCache = new Map<string, SafeHtml | null>();
 
 /**
+ * Entfernt width/height vom äußeren <svg>-Tag (z. B. exportieren manche Tools
+ * ungültige Werte wie height="auto", was die Browser-Konsole mit Fehlern
+ * flutet) — die Größe wird ausschließlich über CSS gesteuert.
+ */
+function stripRootSvgSize(svgText: string): string {
+  return svgText.replace(/<svg\b[^>]*>/, (tag) => tag.replace(/\s(width|height)="[^"]*"/gi, ''));
+}
+
+/**
  * Klickbare Fahrzeug-Silhouette je Kategorie und Perspektive (Schadensposition
  * markieren). Eigene Illustrationen werden aus /public/damage-diagrams/
  * geladen und inline gerendert (statt als <img>), damit die Füllfarbe über
@@ -88,6 +97,14 @@ const svgMarkupCache = new Map<string, SafeHtml | null>();
       }
       @if (x() !== null && y() !== null) {
         <div class="marker" [style.left.%]="x()" [style.top.%]="y()"></div>
+      }
+      @for (m of markers(); track m.id) {
+        <div
+          class="marker clickable"
+          [style.left.%]="m.x"
+          [style.top.%]="m.y"
+          (click)="onMarkerClick($event, m.id)"
+        ></div>
       }
     </div>
   `,
@@ -186,6 +203,10 @@ const svgMarkupCache = new Map<string, SafeHtml | null>();
       box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
       pointer-events: none;
     }
+    .marker.clickable {
+      pointer-events: auto;
+      cursor: pointer;
+    }
   `,
 })
 export class VehicleDamageDiagramComponent {
@@ -201,8 +222,11 @@ export class VehicleDamageDiagramComponent {
   readonly maxWidthPx = input(420);
   /** Füllt die volle Höhe/Breite des Elternelements statt sich an maxWidthPx zu orientieren. */
   readonly fill = input(false);
+  /** Mehrere klickbare Marker (z. B. alle Schäden eines Fahrzeugs auf einer Ansicht). */
+  readonly markers = input<{ id: string; x: number; y: number }[]>([]);
 
   readonly pick = output<{ x: number; y: number }>();
+  readonly markerClick = output<string>();
 
   readonly category = computed<VehicleCategory>(() => {
     const raw = this.rawCategory();
@@ -248,7 +272,9 @@ export class VehicleDamageDiagramComponent {
       .get(url, { responseType: 'text' })
       .pipe(catchError(() => of(null)))
       .subscribe((svgText) => {
-        const markup = svgText ? this.sanitizer.bypassSecurityTrustHtml(svgText) : null;
+        const markup = svgText
+          ? this.sanitizer.bypassSecurityTrustHtml(stripRootSvgSize(svgText))
+          : null;
         svgMarkupCache.set(url, markup);
         if (this.requestId === myRequestId) {
           this.loadedMarkup.set(markup);
@@ -267,5 +293,10 @@ export class VehicleDamageDiagramComponent {
       x: Math.min(100, Math.max(0, x)),
       y: Math.min(100, Math.max(0, y)),
     });
+  }
+
+  onMarkerClick(event: MouseEvent, id: string): void {
+    event.stopPropagation();
+    this.markerClick.emit(id);
   }
 }
