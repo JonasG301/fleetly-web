@@ -2,7 +2,7 @@ export type OrderStatus = 'open' | 'in_progress' | 'done';
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   open: 'Offen',
-  in_progress: 'In Bearbeitung',
+  in_progress: 'Aktiv',
   done: 'Abgeschlossen',
 };
 

@@ -83,7 +83,7 @@ const STATUS_COLOR: Record<string, string> = {
       <mat-menu #addMenu="matMenu">
         <button mat-menu-item (click)="openNewEntry()">
           <mat-icon>event</mat-icon>
-          Freier Termin
+          Termin
         </button>
         <button mat-menu-item (click)="openNewOrder()">
           <mat-icon>assignment</mat-icon>

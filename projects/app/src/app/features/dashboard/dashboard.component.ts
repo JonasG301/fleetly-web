@@ -9,6 +9,7 @@ import { differenceInCalendarDays, isThisWeek, startOfMonth } from 'date-fns';
 import { SupabaseService } from '../../core/services/supabase.service';
 import { DurationPipe } from '../../shared/pipes/duration.pipe';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { CalendarEntriesService } from '../calendar/calendar-entries.service';
 import { DamageReportService } from '../fleet/damage-report/damage-report.service';
 import { FleetService } from '../fleet/fleet.service';
 import { calcTuvInfo } from '../fleet/tuv-status/tuv.utils';
@@ -445,6 +446,7 @@ export class DashboardComponent {
   private readonly fleet = inject(FleetService);
   private readonly damages = inject(DamageReportService);
   private readonly orders = inject(OrdersService);
+  private readonly calendarEntries = inject(CalendarEntriesService);
   private readonly supabase = inject(SupabaseService);
   private readonly prefs = inject(DashboardPreferencesService);
 
@@ -617,6 +619,19 @@ export class DashboardComponent {
       }
     }
 
+    for (const c of this.calendarEntries.entries()) {
+      const start = new Date(c.start_date);
+      if (differenceInCalendarDays(start, today) <= EVENT_HORIZON_DAYS) {
+        events.push({
+          date: start,
+          label: c.title,
+          sub: c.vehicle_id ? (this.fleet.byId(c.vehicle_id)?.plate ?? '') : 'Termin',
+          route: '/kalender',
+          icon: 'event',
+        });
+      }
+    }
+
     return events.sort((a, b) => a.date.getTime() - b.date.getTime()).slice(0, 6);
   });
 
@@ -652,6 +667,7 @@ export class DashboardComponent {
     void this.fleet.load();
     void this.damages.load();
     void this.orders.load();
+    void this.calendarEntries.load();
     void this.loadMonthHours();
     void this.prefs.load();
   }

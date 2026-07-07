@@ -281,7 +281,7 @@ export class OrderListComponent {
         return;
       }
       await this.service.setStatus(order.id, 'in_progress');
-      this.snackBar.open('Auftrag entsperrt (Status: In Bearbeitung)', undefined, {
+      this.snackBar.open('Auftrag entsperrt (Status: Aktiv)', undefined, {
         duration: 3000,
       });
       const reloaded = this.service.byId(order.id);
