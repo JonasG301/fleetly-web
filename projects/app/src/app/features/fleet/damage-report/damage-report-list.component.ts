@@ -20,6 +20,7 @@ import { PageHeaderComponent } from '../../../shared/components/page-header/page
 import { FleetService } from '../fleet.service';
 import { DamageReportPhotosDialogComponent } from './damage-report-photos-dialog.component';
 import { DamageReportService } from './damage-report.service';
+import { VehicleDamageOverviewDialogComponent } from './vehicle-damage-overview-dialog.component';
 
 @Component({
   selector: 'app-damage-report-list',
@@ -143,7 +144,20 @@ import { DamageReportService } from './damage-report.service';
         <th mat-header-cell *matHeaderCellDef>Fotos</th>
         <td mat-cell *matCellDef="let d">
           <button matIconButton type="button" (click)="openPhotos(d)" aria-label="Fotos ansehen">
-            <mat-icon>photo_camera</mat-icon>
+            <mat-icon>photo_library</mat-icon>
+          </button>
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="details">
+        <th mat-header-cell *matHeaderCellDef>Details</th>
+        <td mat-cell *matCellDef="let d">
+          <button
+            matIconButton
+            type="button"
+            (click)="openVehicleOverview(d)"
+            aria-label="Alle Schäden am Fahrzeug ansehen"
+          >
+            <mat-icon>directions_car</mat-icon>
           </button>
         </td>
       </ng-container>
@@ -254,6 +268,7 @@ export class DamageReportListComponent {
     'reporter',
     'status',
     'photos',
+    'details',
   ];
   readonly statuses: DamageStatus[] = ['open', 'in_repair', 'resolved'];
   readonly statusLabels = DAMAGE_STATUS_LABELS;
@@ -316,5 +331,9 @@ export class DamageReportListComponent {
 
   openPhotos(d: DamageReport): void {
     this.dialog.open(DamageReportPhotosDialogComponent, { data: d });
+  }
+
+  openVehicleOverview(d: DamageReport): void {
+    this.dialog.open(VehicleDamageOverviewDialogComponent, { data: { vehicleId: d.vehicle_id } });
   }
 }

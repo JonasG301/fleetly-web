@@ -19,6 +19,7 @@ import { TuvStatusChipComponent } from '../../../shared/components/status-chip/t
 import { CustomersService } from '../../customers/customers.service';
 import { DamageReportPhotosDialogComponent } from '../damage-report/damage-report-photos-dialog.component';
 import { DamageReportService } from '../damage-report/damage-report.service';
+import { VehicleDamageOverviewComponent } from '../damage-report/vehicle-damage-overview.component';
 import { FleetService } from '../fleet.service';
 import { ServiceEntryDialogComponent } from '../service-history/service-entry-dialog.component';
 import { calcTuvInfo } from '../tuv-status/tuv.utils';
@@ -38,6 +39,7 @@ import { calcTuvInfo } from '../tuv-status/tuv.utils';
     PageHeaderComponent,
     TuvStatusChipComponent,
     LicensePlateComponent,
+    VehicleDamageOverviewComponent,
   ],
   template: `
     @if (vehicle(); as v) {
@@ -163,6 +165,12 @@ import { calcTuvInfo } from '../tuv-status/tuv.utils';
           <mat-card-content>
             @if (damages().length === 0) {
               <p class="empty">Keine Schadensmeldungen.</p>
+            } @else {
+              <app-vehicle-damage-overview
+                [damages]="damages()"
+                [category]="v.type"
+                (damageSelect)="openDamagePhotos($event)"
+              />
             }
             <mat-list>
               @for (d of damages(); track d.id) {
@@ -182,7 +190,7 @@ import { calcTuvInfo } from '../tuv-status/tuv.utils';
                     (click)="openDamagePhotos(d)"
                     aria-label="Fotos ansehen"
                   >
-                    <mat-icon>photo_camera</mat-icon>
+                    <mat-icon>photo_library</mat-icon>
                   </button>
                 </mat-list-item>
               }

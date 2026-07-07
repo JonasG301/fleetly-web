@@ -1,3 +1,4 @@
+import { DatePipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
@@ -5,7 +6,11 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { AuthService } from 'auth';
-import { DamageReport, DamageReportPhoto } from '../../../core/models/damage-report.model';
+import {
+  DAMAGE_STATUS_LABELS,
+  DamageReport,
+  DamageReportPhoto,
+} from '../../../core/models/damage-report.model';
 import { NetworkStatusService } from '../../../core/services/network-status.service';
 import { FleetService } from '../fleet.service';
 import { DamageReportService } from './damage-report.service';
@@ -20,6 +25,7 @@ interface PhotoView {
 @Component({
   selector: 'app-damage-report-photos-dialog',
   imports: [
+    DatePipe,
     MatDialogModule,
     MatButtonModule,
     MatIconModule,
@@ -29,6 +35,21 @@ interface PhotoView {
   template: `
     <h2 mat-dialog-title>Details zur Schadensmeldung</h2>
     <mat-dialog-content>
+      <dl class="facts">
+        <dt>Datum</dt>
+        <dd>{{ report.damage_date | date: 'dd.MM.yyyy' }}</dd>
+        <dt>Beschreibung</dt>
+        <dd>{{ report.description }}</dd>
+        @if (report.location) {
+          <dt>Ort</dt>
+          <dd>{{ report.location }}</dd>
+        }
+        <dt>Gemeldet von</dt>
+        <dd>{{ report.reporter_name }}</dd>
+        <dt>Status</dt>
+        <dd>{{ statusLabels[report.status] }}</dd>
+      </dl>
+
       @if (vehicle(); as v) {
         <div class="diagram-section">
           <label class="section-label">Schadensposition</label>
@@ -145,10 +166,25 @@ interface PhotoView {
       font-weight: 600;
       color: var(--hugo-ink-muted);
     }
+    .facts {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 4px 16px;
+      margin: 0;
+    }
+    .facts dt {
+      color: var(--hugo-ink-muted);
+      font-size: 13px;
+    }
+    .facts dd {
+      margin: 0;
+      font-size: 14px;
+    }
   `,
 })
 export class DamageReportPhotosDialogComponent {
   readonly report = inject<DamageReport>(MAT_DIALOG_DATA);
+  readonly statusLabels = DAMAGE_STATUS_LABELS;
   private readonly service = inject(DamageReportService);
   private readonly auth = inject(AuthService);
   private readonly snackBar = inject(MatSnackBar);
