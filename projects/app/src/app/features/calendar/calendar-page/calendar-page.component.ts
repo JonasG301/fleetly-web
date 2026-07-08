@@ -5,7 +5,9 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import {
+  CalendarDateFormatter,
   CalendarDatePipe,
+  CalendarDayViewComponent,
   CalendarEvent,
   CalendarEventTitleFormatter,
   CalendarMonthViewComponent,
@@ -14,6 +16,7 @@ import {
   CalendarPreviousViewDirective,
   CalendarTodayDirective,
   DateAdapter,
+  DateFormatterParams,
   provideCalendar,
 } from 'angular-calendar';
 import { format, isSameDay, isSameMonth } from 'date-fns';
@@ -28,6 +31,25 @@ import { adapterFactory } from 'angular-calendar/date-adapters/date-fns';
 class NoHoverTooltipFormatter extends CalendarEventTitleFormatter {
   override monthTooltip(): string {
     return '';
+  }
+}
+
+/**
+ * Default-Formatter von angular-calendar rendert Stundenbeschriftungen und den
+ * Tagesansicht-Titel fest mit 12h-Format/AM-PM ('h a'), unabhängig vom übergebenen
+ * locale — hier auf deutsche 24h-Zeit umgestellt.
+ */
+class GermanDateFormatter extends CalendarDateFormatter {
+  override dayViewHour({ date }: DateFormatterParams): string {
+    return format(date, 'HH:mm', { locale: de });
+  }
+
+  override weekViewHour({ date }: DateFormatterParams): string {
+    return format(date, 'HH:mm', { locale: de });
+  }
+
+  override dayViewTitle({ date }: DateFormatterParams): string {
+    return format(date, 'EEEE, d. MMMM yyyy', { locale: de });
   }
 }
 import { CalendarEntry } from '../../../core/models/calendar-entry.model';
@@ -65,6 +87,7 @@ const STATUS_COLOR: Record<string, string> = {
     CalendarTodayDirective,
     CalendarNextViewDirective,
     CalendarMonthViewComponent,
+    CalendarDayViewComponent,
     CalendarDatePipe,
   ],
   providers: [
@@ -73,6 +96,7 @@ const STATUS_COLOR: Record<string, string> = {
       useFactory: adapterFactory,
     }),
     { provide: CalendarEventTitleFormatter, useClass: NoHoverTooltipFormatter },
+    { provide: CalendarDateFormatter, useClass: GermanDateFormatter },
   ],
   template: `
     <app-page-header title="Kalender" subtitle="Aufträge und Termine im Überblick">
@@ -104,15 +128,19 @@ const STATUS_COLOR: Record<string, string> = {
 
     <div class="toolbar">
       <div class="nav-group">
-        <button matButton mwlCalendarPreviousView [view]="'month'" [(viewDate)]="viewDate">
+        <button matButton mwlCalendarPreviousView [view]="view()" [(viewDate)]="viewDate">
           <mat-icon>chevron_left</mat-icon>
         </button>
         <button matButton mwlCalendarToday [(viewDate)]="viewDate">Heute</button>
-        <button matButton mwlCalendarNextView [view]="'month'" [(viewDate)]="viewDate">
+        <button matButton mwlCalendarNextView [view]="view()" [(viewDate)]="viewDate">
           <mat-icon>chevron_right</mat-icon>
         </button>
       </div>
-      <h2>{{ viewDate | calendarDate: 'monthViewTitle' : 'de' }}</h2>
+      <h2>{{ viewDate | calendarDate: (view() === 'day' ? 'dayViewTitle' : 'monthViewTitle') : 'de' }}</h2>
+      <div class="view-switch">
+        <button matButton [class.active]="view() === 'month'" (click)="setView('month')">Monat</button>
+        <button matButton [class.active]="view() === 'day'" (click)="setView('day')">Tag</button>
+      </div>
     </div>
 
     <div class="legend">
@@ -128,15 +156,25 @@ const STATUS_COLOR: Record<string, string> = {
       </span>
     </div>
 
-    <mwl-calendar-month-view
-      [viewDate]="viewDate"
-      [events]="events()"
-      [locale]="'de'"
-      [weekStartsOn]="1"
-      [activeDayIsOpen]="activeDayIsOpen()"
-      (eventClicked)="onEventClicked($event.event)"
-      (dayClicked)="onDayClicked($event.day)"
-    />
+    @if (view() === 'month') {
+      <mwl-calendar-month-view
+        [viewDate]="viewDate"
+        [events]="events()"
+        [locale]="'de'"
+        [weekStartsOn]="1"
+        [activeDayIsOpen]="activeDayIsOpen()"
+        (eventClicked)="onEventClicked($event.event)"
+        (dayClicked)="onDayClicked($event.day)"
+      />
+    } @else {
+      <mwl-calendar-day-view
+        [viewDate]="viewDate"
+        [events]="events()"
+        [locale]="'de'"
+        (eventClicked)="onEventClicked($event.event)"
+        (hourSegmentClicked)="openNewEntry($event.date, true)"
+      />
+    }
   `,
   styles: `
     .toolbar {
@@ -150,10 +188,19 @@ const STATUS_COLOR: Record<string, string> = {
       gap: 4px;
     }
     h2 {
+      flex: 1;
       margin: 0;
       font-size: 18px;
       font-weight: 600;
       text-transform: capitalize;
+    }
+    .view-switch {
+      display: flex;
+      gap: 4px;
+    }
+    .view-switch button.active {
+      background: color-mix(in srgb, var(--hugo-accent) 12%, transparent);
+      color: var(--hugo-accent);
     }
     .legend {
       display: flex;
@@ -189,6 +236,7 @@ export class CalendarPageComponent {
 
   viewDate = new Date();
   readonly activeDayIsOpen = signal(false);
+  readonly view = signal<'month' | 'day'>('month');
 
   readonly events = computed<CalendarEvent<CalEventMeta>[]>(() => {
     const orderEvents = this.orders
@@ -225,14 +273,21 @@ export class CalendarPageComponent {
   private toEntryEvent(entry: CalendarEntry): CalendarEvent<CalEventMeta> {
     const color = 'var(--hugo-ink-muted)';
     const vehiclePlate = entry.vehicle_id ? this.fleet.byId(entry.vehicle_id)?.plate : null;
-    const start = new Date(entry.start_date);
-    const end = new Date(entry.end_date);
+    const start = entry.start_time
+      ? new Date(`${entry.start_date}T${entry.start_time}`)
+      : new Date(entry.start_date);
+    const end = entry.end_time
+      ? new Date(`${entry.end_date}T${entry.end_time}`)
+      : new Date(entry.end_date);
     const base = vehiclePlate ? `${entry.title} (${vehiclePlate})` : entry.title;
+    const suffix = entry.start_time
+      ? this.timeRangeSuffix(start, end)
+      : this.dateRangeSuffix(start, end);
     return {
       start,
       end,
-      title: `${base}${this.dateRangeSuffix(start, end)}`,
-      allDay: true,
+      title: `${base}${suffix}`,
+      allDay: !entry.start_time,
       color: { primary: color, secondary: color, secondaryText: 'var(--hugo-ink)' },
       meta: { kind: 'entry', entry },
     };
@@ -248,6 +303,16 @@ export class CalendarPageComponent {
     }
     const fmt = (d: Date) => format(d, 'dd.MM.', { locale: de });
     return ` · ${fmt(start)}–${fmt(end)}`;
+  }
+
+  /** Zeitraum-Suffix für Termine mit Uhrzeit — Monatsansicht zeigt sonst keine Uhrzeit an. */
+  private timeRangeSuffix(start: Date, end: Date): string {
+    const fmtTime = (d: Date) => format(d, 'HH:mm', { locale: de });
+    if (isSameDay(start, end)) {
+      return ` · ${fmtTime(start)}–${fmtTime(end)}`;
+    }
+    const fmtFull = (d: Date) => format(d, 'dd.MM. HH:mm', { locale: de });
+    return ` · ${fmtFull(start)}–${fmtFull(end)}`;
   }
 
   onEventClicked(event: CalendarEvent<CalEventMeta>): void {
@@ -283,13 +348,17 @@ export class CalendarPageComponent {
     }
   }
 
+  setView(view: 'month' | 'day'): void {
+    this.view.set(view);
+  }
+
   openNewOrder(): void {
     this.dialog.open(OrderFormComponent, { data: null });
   }
 
-  openNewEntry(date?: Date): void {
+  openNewEntry(date?: Date, withTime = false): void {
     this.dialog.open(CalendarEntryFormComponent, {
-      data: date ? { start_date: this.toIsoDate(date) } : null,
+      data: date ? { start_date: this.toIsoDate(date), start_time: withTime ? date : undefined } : null,
     });
   }
 

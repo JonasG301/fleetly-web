@@ -3,6 +3,9 @@ export interface CalendarEntry {
   title: string;
   start_date: string;
   end_date: string;
+  /** HH:mm:ss, oder null bei ganztägigem Termin. */
+  start_time: string | null;
+  end_time: string | null;
   vehicle_id: string | null;
   note: string | null;
   created_by: string | null;

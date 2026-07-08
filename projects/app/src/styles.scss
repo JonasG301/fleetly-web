@@ -280,6 +280,49 @@ body {
   background-color: var(--hugo-ink);
   color: var(--hugo-paper);
 }
+// Tagesansicht (baut bei angular-calendar intern auf .cal-week-view auf):
+// gleiche HUGO-Token-Umfärbung wie oben für die Monatsansicht.
+.cal-week-view {
+  background-color: var(--hugo-paper);
+  border-top-color: var(--hugo-hairline);
+}
+.cal-week-view .cal-day-headers,
+.cal-week-view .cal-day-headers .cal-header:not(:last-child),
+.cal-week-view .cal-day-headers .cal-header:first-child,
+.cal-week-view .cal-day-column,
+.cal-week-view .cal-all-day-events,
+.cal-week-view .cal-time-events,
+.cal-week-view .cal-hour:not(:last-child) .cal-hour-segment,
+.cal-week-view .cal-hour:last-child :not(:last-child) .cal-hour-segment {
+  border-color: var(--hugo-hairline);
+}
+.cal-week-view .cal-day-headers span {
+  color: var(--hugo-ink-muted);
+}
+.cal-week-view .cal-day-headers .cal-header:hover,
+.cal-week-view .cal-day-headers .cal-drag-over,
+.cal-week-view .cal-time-events .cal-day-columns:not(.cal-resize-active) .cal-hour-segment:hover,
+.cal-week-view .cal-drag-over .cal-hour-segment {
+  background-color: color-mix(in srgb, var(--hugo-ink) 4%, var(--hugo-paper));
+}
+.cal-week-view .cal-hour-odd {
+  background-color: color-mix(in srgb, var(--hugo-ink) 2%, var(--hugo-paper));
+}
+.cal-week-view .cal-header.cal-today {
+  background-color: color-mix(in srgb, var(--hugo-accent) 12%, var(--hugo-paper));
+}
+.cal-week-view .cal-header.cal-weekend span {
+  color: var(--hugo-status-critical);
+}
+.cal-week-view .cal-event {
+  background-color: var(--hugo-accent);
+  border-color: var(--hugo-accent);
+  color: var(--hugo-accent-on);
+}
+.cal-week-view .cal-current-time-marker {
+  background-color: var(--hugo-status-critical);
+}
+
 // Kleine Bildschirme: Event-Punkte sind sonst zu klein zum Antippen (< 24px)
 // und die Labels laufen in den engen Zellen ineinander.
 @media (max-width: 600px) {

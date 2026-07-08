@@ -1,11 +1,33 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
+import { GridsterComponent, GridsterItemComponent, GridsterConfig, GridsterItem } from 'angular-gridster2';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { AuthService } from 'auth';
-import { differenceInCalendarDays, isThisWeek, startOfMonth } from 'date-fns';
+import {
+  CalendarDateFormatter,
+  CalendarEvent,
+  CalendarDayViewComponent,
+  CalendarEventTitleFormatter,
+  CalendarMonthViewComponent,
+  DateAdapter,
+  DateFormatterParams,
+  provideCalendar,
+} from 'angular-calendar';
+import { adapterFactory } from 'angular-calendar/date-adapters/date-fns';
+import {
+  differenceInCalendarDays,
+  format,
+  isThisWeek,
+  startOfMonth,
+  addMonths,
+  subMonths,
+  addDays,
+  subDays,
+} from 'date-fns';
+import { de } from 'date-fns/locale';
 import { SupabaseService } from '../../core/services/supabase.service';
 import { DurationPipe } from '../../shared/pipes/duration.pipe';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
@@ -14,10 +36,36 @@ import { DamageReportService } from '../fleet/damage-report/damage-report.servic
 import { FleetService } from '../fleet/fleet.service';
 import { calcTuvInfo } from '../fleet/tuv-status/tuv.utils';
 import { OrdersService } from '../orders/orders.service';
-import {
-  DashboardPreferencesService,
-  WidgetPref,
-} from './dashboard-preferences.service';
+import { DashboardPreferencesService, GridWidgetPref, WidgetPref } from './dashboard-preferences.service';
+
+/**
+ * Standard-Tooltip von angular-calendar reagiert nur auf Hover und liefert auf
+ * Touch-Geräten (Handy/Tablet) keine zusätzliche Info — im kompakten Widget
+ * ohnehin nur Auftrags-/Termintitel, deshalb abgeschaltet (wie in CalendarPageComponent).
+ */
+class NoHoverTooltipFormatter extends CalendarEventTitleFormatter {
+  override monthTooltip(): string {
+    return '';
+  }
+}
+
+/** Default-Formatter rendert Stundenbeschriftungen fest mit 12h-Format/AM-PM — hier
+ *  auf deutsche 24h-Zeit umgestellt (siehe CalendarPageComponent). */
+class GermanDateFormatter extends CalendarDateFormatter {
+  override dayViewHour({ date }: DateFormatterParams): string {
+    return format(date, 'HH:mm', { locale: de });
+  }
+
+  override weekViewHour({ date }: DateFormatterParams): string {
+    return format(date, 'HH:mm', { locale: de });
+  }
+}
+
+const CAL_STATUS_COLOR: Record<string, string> = {
+  open: 'var(--hugo-status-unknown)',
+  in_progress: 'var(--hugo-status-warn)',
+  done: 'var(--hugo-status-ok)',
+};
 
 interface DashboardCard {
   label: string;
@@ -80,16 +128,74 @@ const KPIS: KpiDef[] = [
   { id: 'hours', label: 'Meine Stunden (Monat)', icon: 'schedule', route: '/meine-zeiten', kind: 'duration' },
 ];
 
+type WidgetKind = 'kpi' | 'events' | 'calendar' | 'nav';
+
+/** Statische Definition eines Grid-Widgets: Art, Titel und Default-Position/-Größe. */
+interface WidgetDef {
+  id: string;
+  kind: WidgetKind;
+  title: string;
+  kpiId?: string;
+  defaultItem: GridsterItem;
+}
+
+/** Default-Anordnung auf einem 12-Spalten-Grid — Nutzer können frei umsortieren. */
+const WIDGET_DEFS: WidgetDef[] = [
+  { id: 'kpi:tuv', kind: 'kpi', kpiId: 'tuv', title: 'HU-Status', defaultItem: gridItem(0, 0, 3, 2) },
+  { id: 'kpi:damages', kind: 'kpi', kpiId: 'damages', title: 'Schäden', defaultItem: gridItem(3, 0, 3, 2) },
+  { id: 'kpi:orders', kind: 'kpi', kpiId: 'orders', title: 'Aufträge', defaultItem: gridItem(6, 0, 3, 2) },
+  {
+    id: 'kpi:leasingEnding',
+    kind: 'kpi',
+    kpiId: 'leasingEnding',
+    title: 'Leasing',
+    defaultItem: gridItem(9, 0, 3, 2),
+  },
+  {
+    id: 'kpi:hours',
+    kind: 'kpi',
+    kpiId: 'hours',
+    title: 'Meine Stunden (Monat)',
+    defaultItem: gridItem(0, 2, 3, 2),
+  },
+  { id: 'events', kind: 'events', title: 'Nächste Termine', defaultItem: gridItem(3, 2, 5, 4, 3, 3) },
+  { id: 'calendar', kind: 'calendar', title: 'Kalender', defaultItem: gridItem(8, 2, 4, 6, 3, 3) },
+  { id: 'nav', kind: 'nav', title: 'Links', defaultItem: gridItem(0, 6, 8, 6, 3, 3) },
+];
+
+function gridItem(
+  x: number,
+  y: number,
+  cols: number,
+  rows: number,
+  minItemCols = 2,
+  minItemRows = 2,
+): GridsterItem {
+  return { x, y, cols, rows, minItemCols, minItemRows };
+}
+
 @Component({
   selector: 'app-dashboard',
   imports: [
     RouterLink,
     DragDropModule,
+    GridsterComponent,
+    GridsterItemComponent,
     MatButtonModule,
     MatIconModule,
     DurationPipe,
     DatePipe,
     PageHeaderComponent,
+    CalendarMonthViewComponent,
+    CalendarDayViewComponent,
+  ],
+  providers: [
+    provideCalendar({
+      provide: DateAdapter,
+      useFactory: adapterFactory,
+    }),
+    { provide: CalendarEventTitleFormatter, useClass: NoHoverTooltipFormatter },
+    { provide: CalendarDateFormatter, useClass: GermanDateFormatter },
   ],
   template: `
     <app-page-header
@@ -110,124 +216,188 @@ const KPIS: KpiDef[] = [
 
     @if (editMode()) {
       <p class="edit-hint">
-        Kacheln per Drag &amp; Drop anordnen, mit dem Auge ein-/ausblenden.
+        Kacheln am Titel per Drag &amp; Drop frei anordnen, an der Ecke unten rechts in der
+        Größe ziehen, mit dem Auge ein-/ausblenden.
       </p>
     }
 
-    <div
-      class="kpi-row"
-      cdkDropList
-      cdkDropListOrientation="mixed"
-      [cdkDropListDisabled]="!editMode()"
-      (cdkDropListDropped)="dropKpi($event)"
-    >
-      @for (w of kpiWidgets(); track w.def.id) {
-        <a
-          class="kpi"
-          [class.kpi-bar]="w.def.kind === 'bar'"
-          cdkDrag
-          [class.editing]="editMode()"
-          [class.hidden-widget]="w.hidden"
-          [routerLink]="editMode() ? null : w.def.route"
-        >
-          @if (editMode()) {
-            <button
-              class="hide-btn"
-              type="button"
-              [attr.aria-label]="w.hidden ? 'Einblenden' : 'Ausblenden'"
-              (click)="toggleHidden('kpis', w.def.id)"
-            >
-              <mat-icon>{{ w.hidden ? 'visibility_off' : 'visibility' }}</mat-icon>
-            </button>
-          }
-          @if (w.def.kind === 'duration') {
-            <span class="kpi-value hugo-stat">{{ hoursThisMonth() | duration }}</span>
-            <span class="kpi-label">{{ w.def.label }}</span>
-          } @else {
-            @let bar = healthBar(w.def.id);
-            <div class="bar-header">
-              <span class="kpi-label">{{ w.def.label }}</span>
-              <span class="bar-total">{{ bar.total }}</span>
+    <gridster [options]="gridOptions()" class="dashboard-grid">
+      @for (w of visibleWidgets(); track w.def.id) {
+        <gridster-item [item]="w.item" [class.hidden-widget]="w.hidden">
+          <div class="widget" [class.editing]="editMode()">
+            <div class="widget-header" [class.widget-drag-handle]="editMode()">
+              <span class="widget-title">{{ w.def.title }}</span>
+              @if (w.def.kind === 'calendar') {
+                <div class="cal-nav">
+                  <button
+                    mat-icon-button
+                    type="button"
+                    (click)="prevCalendarPeriod()"
+                    aria-label="Zurück"
+                  >
+                    <mat-icon>chevron_left</mat-icon>
+                  </button>
+                  <span class="cal-month-label">{{ calendarPeriodLabel() }}</span>
+                  <button
+                    mat-icon-button
+                    type="button"
+                    (click)="nextCalendarPeriod()"
+                    aria-label="Weiter"
+                  >
+                    <mat-icon>chevron_right</mat-icon>
+                  </button>
+                  <button
+                    class="cal-view-btn"
+                    type="button"
+                    [class.active]="calendarView() === 'month'"
+                    (click)="setCalendarView('month')"
+                  >
+                    Monat
+                  </button>
+                  <button
+                    class="cal-view-btn"
+                    type="button"
+                    [class.active]="calendarView() === 'day'"
+                    (click)="setCalendarView('day')"
+                  >
+                    Tag
+                  </button>
+                  <a mat-button routerLink="/kalender" class="cal-open-link">Öffnen</a>
+                </div>
+              }
+              @if (editMode()) {
+                <button
+                  class="hide-btn"
+                  type="button"
+                  [attr.aria-label]="w.hidden ? 'Einblenden' : 'Ausblenden'"
+                  (click)="toggleWidgetHidden(w.def.id)"
+                >
+                  <mat-icon>{{ w.hidden ? 'visibility_off' : 'visibility' }}</mat-icon>
+                </button>
+              }
             </div>
-            @if (bar.total > 0) {
-              <div class="bar-track">
-                @for (seg of bar.segments; track seg.token) {
-                  @if (seg.count > 0) {
-                    <span
-                      class="bar-seg"
-                      [style.width.%]="(seg.count / bar.total) * 100"
-                      [style.background]="'var(' + seg.token + ')'"
-                    ></span>
+
+            <div class="widget-body">
+              @switch (w.def.kind) {
+                @case ('kpi') {
+                  @let kpi = kpiDef(w.def.kpiId!);
+                  <a class="kpi-body" [routerLink]="editMode() ? null : kpi.route">
+                    @if (kpi.kind === 'duration') {
+                      <span class="kpi-value hugo-stat">{{ hoursThisMonth() | duration }}</span>
+                    } @else {
+                      @let bar = healthBar(kpi.id);
+                      <div class="bar-header">
+                        <span class="bar-total">{{ bar.total }}</span>
+                      </div>
+                      @if (bar.total > 0) {
+                        <div class="bar-track">
+                          @for (seg of bar.segments; track seg.token) {
+                            @if (seg.count > 0) {
+                              <span
+                                class="bar-seg"
+                                [style.width.%]="(seg.count / bar.total) * 100"
+                                [style.background]="'var(' + seg.token + ')'"
+                              ></span>
+                            }
+                          }
+                        </div>
+                        <div class="bar-legend">
+                          @for (seg of bar.segments; track seg.token) {
+                            @if (seg.count > 0) {
+                              <span class="legend-item">
+                                <i [style.background]="'var(' + seg.token + ')'"></i>
+                                {{ seg.count }} {{ seg.title }}
+                              </span>
+                            }
+                          }
+                        </div>
+                      } @else {
+                        <div class="bar-track bar-track-empty"></div>
+                        <span class="bar-empty">{{ bar.emptyLabel }}</span>
+                      }
+                    }
+                  </a>
+                }
+                @case ('events') {
+                  @if (upcomingEvents().length > 0) {
+                    <div class="events-list">
+                      @for (e of upcomingEvents(); track e.label + e.sub) {
+                        <a class="event-row" [routerLink]="e.route">
+                          <mat-icon class="event-icon">{{ e.icon }}</mat-icon>
+                          <span class="event-label">{{ e.label }}</span>
+                          <span class="event-sub">{{ e.sub }}</span>
+                          <span class="event-date" [class.overdue]="e.date < today">{{
+                            e.date | date: 'dd.MM.yyyy'
+                          }}</span>
+                        </a>
+                      }
+                    </div>
+                  } @else {
+                    <p class="widget-empty">Keine anstehenden Termine</p>
                   }
                 }
-              </div>
-              <div class="bar-legend">
-                @for (seg of bar.segments; track seg.token) {
-                  @if (seg.count > 0) {
-                    <span class="legend-item">
-                      <i [style.background]="'var(' + seg.token + ')'"></i>
-                      {{ seg.count }} {{ seg.title }}
-                    </span>
-                  }
+                @case ('calendar') {
+                  <div class="calendar-widget">
+                    @if (calendarView() === 'month') {
+                      <mwl-calendar-month-view
+                        [viewDate]="calendarViewDate()"
+                        [events]="calendarEvents()"
+                        [locale]="'de'"
+                        [weekStartsOn]="1"
+                        [activeDayIsOpen]="false"
+                        (dayClicked)="goToCalendar()"
+                        (eventClicked)="goToCalendar()"
+                      />
+                    } @else {
+                      <mwl-calendar-day-view
+                        [viewDate]="calendarViewDate()"
+                        [events]="calendarEvents()"
+                        [locale]="'de'"
+                        (eventClicked)="goToCalendar()"
+                      />
+                    }
+                  </div>
                 }
-              </div>
-            } @else {
-              <div class="bar-track bar-track-empty"></div>
-              <span class="bar-empty">{{ bar.emptyLabel }}</span>
-            }
-          }
-        </a>
+                @case ('nav') {
+                  <div
+                    class="nav-list"
+                    cdkDropList
+                    cdkDropListOrientation="mixed"
+                    [cdkDropListDisabled]="!editMode()"
+                    (cdkDropListDropped)="dropCard($event)"
+                  >
+                    @for (c of cardWidgets(); track c.def.route) {
+                      <a
+                        class="nav-row"
+                        cdkDrag
+                        [class.editing]="editMode()"
+                        [class.hidden-widget]="c.hidden"
+                        [routerLink]="editMode() ? null : c.def.route"
+                      >
+                        <mat-icon class="nav-icon">{{ c.def.icon }}</mat-icon>
+                        <span class="nav-label">{{ c.def.label }}</span>
+                        @if (editMode()) {
+                          <button
+                            class="hide-btn"
+                            type="button"
+                            [attr.aria-label]="c.hidden ? 'Einblenden' : 'Ausblenden'"
+                            (click)="toggleCardHidden(c.def.route)"
+                          >
+                            <mat-icon>{{ c.hidden ? 'visibility_off' : 'visibility' }}</mat-icon>
+                          </button>
+                        } @else {
+                          <mat-icon class="chevron">chevron_right</mat-icon>
+                        }
+                      </a>
+                    }
+                  </div>
+                }
+              }
+            </div>
+          </div>
+        </gridster-item>
       }
-    </div>
-
-    @if (upcomingEvents().length > 0) {
-      <h2 class="section-title">Nächste Termine</h2>
-      <div class="events-list">
-        @for (e of upcomingEvents(); track e.label + e.sub) {
-          <a class="event-row" [routerLink]="e.route">
-            <mat-icon class="event-icon">{{ e.icon }}</mat-icon>
-            <span class="event-label">{{ e.label }}</span>
-            <span class="event-sub">{{ e.sub }}</span>
-            <span class="event-date" [class.overdue]="e.date < today">{{
-              e.date | date: 'dd.MM.yyyy'
-            }}</span>
-          </a>
-        }
-      </div>
-    }
-
-    <div
-      class="nav-list"
-      cdkDropList
-      cdkDropListOrientation="mixed"
-      [cdkDropListDisabled]="!editMode()"
-      (cdkDropListDropped)="dropCard($event)"
-    >
-      @for (w of cardWidgets(); track w.def.route) {
-        <a
-          class="nav-row"
-          cdkDrag
-          [class.editing]="editMode()"
-          [class.hidden-widget]="w.hidden"
-          [routerLink]="editMode() ? null : w.def.route"
-        >
-          <mat-icon class="nav-icon">{{ w.def.icon }}</mat-icon>
-          <span class="nav-label">{{ w.def.label }}</span>
-          @if (editMode()) {
-            <button
-              class="hide-btn"
-              type="button"
-              [attr.aria-label]="w.hidden ? 'Einblenden' : 'Ausblenden'"
-              (click)="toggleHidden('cards', w.def.route)"
-            >
-              <mat-icon>{{ w.hidden ? 'visibility_off' : 'visibility' }}</mat-icon>
-            </button>
-          } @else {
-            <mat-icon class="chevron">chevron_right</mat-icon>
-          }
-        </a>
-      }
-    </div>
+    </gridster>
   `,
   styles: `
     .edit-hint {
@@ -236,40 +406,80 @@ const KPIS: KpiDef[] = [
       color: var(--hugo-ink-muted);
     }
 
-    /* ── Kennzahlen: Ampel-Balken statt reiner Zahlen ────────────────── */
-    .kpi-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 32px;
-      margin: 4px 0 28px;
-      padding-bottom: 20px;
-      border-bottom: 1px solid var(--hugo-hairline);
+    /* ── Grid-Widgets ─────────────────────────────────────────────────── */
+    /* angular-gridster2 setzt selbst eine graue Default-Hintergrundfarbe und
+       eigene Höhe/Breite per Inline-Style (gridType 'verticalFixed' wächst
+       automatisch mit der Zeilenzahl) — hier nur auf HUGO-Papierfarbe umfärben,
+       keine eigene Höhe erzwingen. */
+    .dashboard-grid {
+      background: var(--hugo-paper) !important;
+      margin-bottom: 24px;
     }
-    .kpi {
-      position: relative;
+    .widget {
       display: flex;
       flex-direction: column;
-      gap: 2px;
-      text-decoration: none;
-      color: inherit;
-      min-width: 120px;
+      height: 100%;
+      border: 1px solid var(--hugo-hairline);
+      border-radius: var(--hugo-radius-control);
+      background: var(--hugo-paper);
+      overflow: hidden;
     }
-    .kpi-bar {
-      min-width: 180px;
-      flex: 1 1 180px;
-      max-width: 260px;
-      gap: 6px;
+    .widget-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px 8px;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--hugo-hairline);
     }
-    .kpi-label {
+    .widget.editing .widget-header.widget-drag-handle {
+      cursor: grab;
+    }
+    .widget.editing .widget-header.widget-drag-handle:active {
+      cursor: grabbing;
+    }
+    .widget-title {
+      flex: 1;
       font-size: 12px;
-      font-weight: 600;
+      font-weight: 700;
       letter-spacing: 0.04em;
       color: var(--hugo-ink-muted);
+    }
+    .widget-body {
+      flex: 1;
+      min-height: 0;
+      padding: 10px;
+      overflow: auto;
+    }
+    .widget-empty {
+      margin: 0;
+      font-size: 12px;
+      color: var(--hugo-ink-muted);
+    }
+    /* gridster-item bringt selbst einen eckigen, weißen Hintergrund mit (eigenes
+       Encapsulated-CSS der Bibliothek) — unser .widget-Div legt zwar abgerundete
+       Ecken darüber, aber an den Ecken blitzt sonst das weiße Rechteck durch. */
+    gridster-item {
+      background: transparent !important;
+      border-radius: var(--hugo-radius-control);
+    }
+    gridster-item.hidden-widget {
+      opacity: 0.4;
+    }
+
+    /* ── Kennzahlen: Ampel-Balken statt reiner Zahlen ────────────────── */
+    .kpi-body {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      height: 100%;
+      text-decoration: none;
+      color: inherit;
     }
     .bar-header {
       display: flex;
       align-items: baseline;
-      justify-content: space-between;
+      justify-content: flex-end;
     }
     .bar-total {
       font-size: 13px;
@@ -313,26 +523,16 @@ const KPIS: KpiDef[] = [
       color: var(--hugo-ink-muted);
     }
 
-    /* ── Nächste Termine: kompakte Mini-Kalenderliste ────────────────── */
-    .section-title {
-      margin: 0 0 8px;
-      font-size: 13px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      color: var(--hugo-ink-muted);
-    }
+    /* ── Nächste Termine ──────────────────────────────────────────────── */
     .events-list {
       display: flex;
       flex-direction: column;
-      border-top: 1px solid var(--hugo-hairline);
-      max-width: 560px;
-      margin-bottom: 28px;
     }
     .event-row {
       display: flex;
       align-items: center;
       gap: 12px;
-      padding: 10px 4px;
+      padding: 8px 2px;
       border-bottom: 1px solid var(--hugo-hairline);
       text-decoration: none;
       color: var(--hugo-ink);
@@ -363,19 +563,69 @@ const KPIS: KpiDef[] = [
       font-weight: 600;
     }
 
+    /* ── Kalender ─────────────────────────────────────────────────────── */
+    .cal-nav {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 2px;
+    }
+    .cal-month-label {
+      min-width: 70px;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+    .cal-view-btn {
+      border: none;
+      background: transparent;
+      border-radius: var(--hugo-radius-control);
+      padding: 4px 8px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--hugo-ink-muted);
+      cursor: pointer;
+    }
+    .cal-view-btn.active {
+      background: color-mix(in srgb, var(--hugo-accent) 12%, transparent);
+      color: var(--hugo-accent);
+    }
+    .cal-open-link {
+      margin-left: 4px;
+      color: var(--hugo-ink-muted);
+    }
+    .calendar-widget {
+      height: 100%;
+    }
+    .calendar-widget ::ng-deep .cal-month-view .cal-day-cell {
+      min-height: 44px;
+    }
+    .calendar-widget ::ng-deep .cal-month-view .cal-event {
+      cursor: pointer;
+    }
+    .calendar-widget ::ng-deep .cal-month-view .cal-event-title {
+      font-size: 11px;
+    }
+    .calendar-widget ::ng-deep .cal-month-view .cal-header .cal-cell {
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      font-size: 11px;
+      padding: 0 2px;
+    }
+
     /* ── Navigation: dichte Hairline-Liste statt bunter Kacheln ──────── */
     .nav-list {
       display: flex;
       flex-direction: column;
-      border-top: 1px solid var(--hugo-hairline);
-      max-width: 560px;
     }
     .nav-row {
       position: relative;
       display: flex;
       align-items: center;
       gap: 14px;
-      padding: 14px 4px;
+      padding: 12px 4px;
       border-bottom: 1px solid var(--hugo-hairline);
       text-decoration: none;
       color: var(--hugo-ink);
@@ -449,11 +699,44 @@ export class DashboardComponent {
   private readonly calendarEntries = inject(CalendarEntriesService);
   private readonly supabase = inject(SupabaseService);
   private readonly prefs = inject(DashboardPreferencesService);
+  private readonly router = inject(Router);
 
   private readonly monthSeconds = signal(0);
 
   readonly editMode = signal(false);
   readonly today = new Date();
+
+  /** Grid-Konfiguration für angular-gridster2 — Drag/Resize nur im Bearbeiten-Modus. */
+  readonly gridOptions = computed<GridsterConfig>(() => {
+    const editing = this.editMode();
+    return {
+      gridType: 'verticalFixed',
+      setGridSize: true,
+      fixedRowHeight: 54,
+      minCols: 12,
+      maxCols: 12,
+      minRows: 4,
+      margin: 16,
+      outerMargin: false,
+      mobileBreakpoint: 720,
+      compactType: 'none',
+      pushItems: true,
+      swap: false,
+      displayGrid: editing ? 'always' : 'none',
+      draggable: {
+        enabled: editing,
+        dragHandleClass: 'widget-drag-handle',
+        // gridster committet die finale Position erst NACH Auflösen dieses stop-Promises
+        // (makeDrag() läuft als .then()-Microtask danach) — mit setTimeout einen Tick
+        // warten, sonst persistieren wir die Position von VOR dem Drop.
+        stop: () => void setTimeout(() => this.persistGridLayout()),
+      },
+      resizable: {
+        enabled: editing,
+        stop: () => void setTimeout(() => this.persistGridLayout()),
+      },
+    };
+  });
 
   /** HU-Status aller aktiven Fahrzeuge als Ampel-Balken. */
   readonly tuvBar = computed<HealthBar>(() => {
@@ -635,26 +918,64 @@ export class DashboardComponent {
     return events.sort((a, b) => a.date.getTime() - b.date.getTime()).slice(0, 6);
   });
 
-  /** Gespeicherte Reihenfolge + neue Widgets angehängt, entfernte bereinigt. */
-  private readonly kpiPrefs = computed(() =>
-    mergeLayout(
-      KPIS.map((k) => k.id),
-      this.prefs.layout().kpis,
-    ),
+  /** Kompakte Monats-/Tagesansicht: gleiche Datenquelle wie die Kalender-Seite. */
+  readonly calendarViewDate = signal(new Date());
+  readonly calendarView = signal<'month' | 'day'>('month');
+
+  readonly calendarPeriodLabel = computed(() =>
+    this.calendarView() === 'day'
+      ? format(this.calendarViewDate(), 'EEE, d. MMM', { locale: de })
+      : format(this.calendarViewDate(), 'MMMM yyyy', { locale: de }),
   );
 
+  readonly calendarEvents = computed<CalendarEvent[]>(() => {
+    const orderEvents = this.orders
+      .orders()
+      .filter((o) => !!o.start_date)
+      .map((o): CalendarEvent => {
+        const color = CAL_STATUS_COLOR[o.status];
+        return {
+          start: new Date(o.start_date!),
+          end: new Date(o.end_date ?? o.start_date!),
+          title: o.order_number,
+          allDay: true,
+          color: { primary: color, secondary: color, secondaryText: 'var(--hugo-ink)' },
+        };
+      });
+    const entryEvents = this.calendarEntries.entries().map((e): CalendarEvent => {
+      const color = 'var(--hugo-ink-muted)';
+      const start = e.start_time ? new Date(`${e.start_date}T${e.start_time}`) : new Date(e.start_date);
+      const end = e.end_time ? new Date(`${e.end_date}T${e.end_time}`) : new Date(e.end_date);
+      return {
+        start,
+        end,
+        title: e.title,
+        allDay: !e.start_time,
+        color: { primary: color, secondary: color, secondaryText: 'var(--hugo-ink)' },
+      };
+    });
+    return [...orderEvents, ...entryEvents];
+  });
+
+  /**
+   * Grid-Widgets: gespeicherte Position/Größe + neue Widgets defaultmäßig
+   * angehängt, entfernte bereinigt. Die item-Objekte sind mutable — gridster
+   * schreibt x/y/cols/rows während Drag/Resize direkt hinein — und bleiben
+   * über die Editier-Session stabil, solange sich `prefs.layout()` nicht
+   * ändert (nur beim Speichern nach Drag/Resize-Ende).
+   */
+  private readonly widgetPrefs = computed(() => mergeGridLayout(this.prefs.layout().items));
+
+  readonly visibleWidgets = computed(() =>
+    this.widgetPrefs().filter((w) => this.editMode() || !w.hidden),
+  );
+
+  /** Gespeicherte Reihenfolge der Links im "Links"-Widget. */
   private readonly cardPrefs = computed(() =>
-    mergeLayout(
+    mergeCardLayout(
       CARDS.filter((c) => !c.adminOnly || this.auth.isAdmin()).map((c) => c.route),
       this.prefs.layout().cards,
     ),
-  );
-
-  /** Anzeige-Liste: im Bearbeiten-Modus auch ausgeblendete (gedimmt). */
-  readonly kpiWidgets = computed(() =>
-    this.kpiPrefs()
-      .filter((w) => this.editMode() || !w.hidden)
-      .map((w) => ({ def: KPIS.find((k) => k.id === w.id)!, hidden: !!w.hidden })),
   );
 
   readonly cardWidgets = computed(() =>
@@ -670,6 +991,10 @@ export class DashboardComponent {
     void this.calendarEntries.load();
     void this.loadMonthHours();
     void this.prefs.load();
+  }
+
+  kpiDef(id: string): KpiDef {
+    return KPIS.find((k) => k.id === id)!;
   }
 
   healthBar(id: string): HealthBar {
@@ -691,36 +1016,58 @@ export class DashboardComponent {
     this.editMode.update((v) => !v);
   }
 
-  // Drop-Indizes beziehen sich auf die gerenderte Liste; im Bearbeiten-Modus
-  // (nur dort ist Drag aktiv) werden alle Widgets gerendert → 1:1 zu kpiPrefs.
-  dropKpi(event: CdkDragDrop<unknown>): void {
-    const list = [...this.kpiPrefs()];
-    moveItemInArray(list, event.previousIndex, event.currentIndex);
-    void this.saveLayout(list, this.cardPrefs());
+  toggleWidgetHidden(id: string): void {
+    const items = this.widgetPrefs().map((w) =>
+      w.def.id === id
+        ? { id: w.def.id, x: w.item.x, y: w.item.y, cols: w.item.cols, rows: w.item.rows, hidden: !w.hidden }
+        : toGridWidgetPref(w),
+    );
+    void this.prefs.save({ version: 2, items, cards: this.cardPrefs() });
   }
 
   dropCard(event: CdkDragDrop<unknown>): void {
     const list = [...this.cardPrefs()];
     moveItemInArray(list, event.previousIndex, event.currentIndex);
-    void this.saveLayout(this.kpiPrefs(), list);
+    void this.prefs.save({
+      version: 2,
+      items: this.widgetPrefs().map(toGridWidgetPref),
+      cards: list,
+    });
   }
 
-  toggleHidden(section: 'kpis' | 'cards', id: string): void {
-    const flip = (list: WidgetPref[]) =>
-      list.map((w) => (w.id === id ? { ...w, hidden: !w.hidden } : w));
-    if (section === 'kpis') {
-      void this.saveLayout(flip(this.kpiPrefs()), this.cardPrefs());
-    } else {
-      void this.saveLayout(this.kpiPrefs(), flip(this.cardPrefs()));
-    }
+  toggleCardHidden(id: string): void {
+    const cards = this.cardPrefs().map((w) => (w.id === id ? { ...w, hidden: !w.hidden } : w));
+    void this.prefs.save({ version: 2, items: this.widgetPrefs().map(toGridWidgetPref), cards });
   }
 
   resetLayout(): void {
-    void this.prefs.save({ version: 1, kpis: [], cards: [] });
+    void this.prefs.save({ version: 2, items: [], cards: [] });
   }
 
-  private saveLayout(kpis: WidgetPref[], cards: WidgetPref[]): Promise<void> {
-    return this.prefs.save({ version: 1, kpis, cards });
+  setCalendarView(view: 'month' | 'day'): void {
+    this.calendarView.set(view);
+  }
+
+  prevCalendarPeriod(): void {
+    this.calendarViewDate.update((d) => (this.calendarView() === 'day' ? subDays(d, 1) : subMonths(d, 1)));
+  }
+
+  nextCalendarPeriod(): void {
+    this.calendarViewDate.update((d) => (this.calendarView() === 'day' ? addDays(d, 1) : addMonths(d, 1)));
+  }
+
+  goToCalendar(): void {
+    void this.router.navigate(['/kalender']);
+  }
+
+  /** Wird nach Drag- oder Resize-Ende eines Grid-Widgets aufgerufen — persistiert die
+   *  aktuellen (von gridster direkt in die item-Objekte geschriebenen) Positionen. */
+  private persistGridLayout(): void {
+    void this.prefs.save({
+      version: 2,
+      items: this.widgetPrefs().map(toGridWidgetPref),
+      cards: this.cardPrefs(),
+    });
   }
 
   private async loadMonthHours(): Promise<void> {
@@ -741,11 +1088,52 @@ export class DashboardComponent {
   }
 }
 
+interface GridWidgetInstance {
+  def: WidgetDef;
+  item: GridsterItem;
+  hidden: boolean;
+}
+
+function toGridWidgetPref(w: GridWidgetInstance): GridWidgetPref {
+  return { id: w.def.id, x: w.item.x, y: w.item.y, cols: w.item.cols, rows: w.item.rows, hidden: w.hidden };
+}
+
 /**
- * Vereinigt gespeicherte Reihenfolge mit den aktuellen Defaults:
- * unbekannte (entfernte) Widgets fliegen raus, neue kommen hinten dran.
+ * Vereinigt gespeicherte Grid-Positionen mit den Default-Widgets: unbekannte
+ * (entfernte) Widgets fliegen raus, neue werden unterhalb der gespeicherten
+ * Widgets angehängt (Kollisionen löst gridster beim Rendern automatisch auf).
  */
-function mergeLayout(defaultIds: string[], saved: WidgetPref[]): WidgetPref[] {
+function mergeGridLayout(saved: GridWidgetPref[]): GridWidgetInstance[] {
+  const savedById = new Map(saved.filter((s) => WIDGET_DEFS.some((d) => d.id === s.id)).map((s) => [s.id, s]));
+  const yOffset =
+    savedById.size > 0 ? Math.max(0, ...[...savedById.values()].map((s) => s.y + s.rows)) : 0;
+
+  return WIDGET_DEFS.map((def) => {
+    const s = savedById.get(def.id);
+    if (s) {
+      return {
+        def,
+        hidden: !!s.hidden,
+        item: gridItem(s.x, s.y, s.cols, s.rows, def.defaultItem.minItemCols, def.defaultItem.minItemRows),
+      };
+    }
+    return {
+      def,
+      hidden: false,
+      item: gridItem(
+        def.defaultItem.x,
+        def.defaultItem.y + yOffset,
+        def.defaultItem.cols,
+        def.defaultItem.rows,
+        def.defaultItem.minItemCols,
+        def.defaultItem.minItemRows,
+      ),
+    };
+  });
+}
+
+/** Vereinigt gespeicherte Reihenfolge mit den aktuellen Default-Links. */
+function mergeCardLayout(defaultIds: string[], saved: WidgetPref[]): WidgetPref[] {
   const known = new Set(defaultIds);
   const result = saved.filter((w) => known.has(w.id));
   for (const id of defaultIds) {

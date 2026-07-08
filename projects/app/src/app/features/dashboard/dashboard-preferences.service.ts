@@ -2,7 +2,17 @@ import { Injectable, inject, signal } from '@angular/core';
 import { AuthService } from 'auth';
 import { SupabaseService } from '../../core/services/supabase.service';
 
-/** Ein Widget-Eintrag im gespeicherten Layout. */
+/** Position/Größe eines Grid-Widgets (Kennzahl, Termine, Kalender, Links …). */
+export interface GridWidgetPref {
+  id: string;
+  x: number;
+  y: number;
+  cols: number;
+  rows: number;
+  hidden?: boolean;
+}
+
+/** Ein Eintrag einer internen Liste (z. B. Reihenfolge der Links im "Links"-Widget). */
 export interface WidgetPref {
   id: string;
   hidden?: boolean;
@@ -10,18 +20,23 @@ export interface WidgetPref {
 
 /** Persistiertes Dashboard-Layout (jsonb-Spalte dashboard_preferences.layout). */
 export interface DashboardLayout {
-  version: 1;
-  kpis: WidgetPref[];
+  version: 2;
+  items: GridWidgetPref[];
   cards: WidgetPref[];
 }
 
-const EMPTY_LAYOUT: DashboardLayout = { version: 1, kpis: [], cards: [] };
+const EMPTY_LAYOUT: DashboardLayout = { version: 2, items: [], cards: [] };
 
 /**
  * Lädt und speichert die persönliche Dashboard-Anordnung (eine Zeile je
  * Nutzer in dashboard_preferences, Upsert auf user_id). Fehler beim
  * Speichern sind nicht kritisch — das Dashboard funktioniert auch mit
  * Default-Layout weiter.
+ *
+ * Layout-Version 2: frei positionierbares/größenveränderbares Grid (vorher:
+ * Version 1 mit reinen Reihenfolgelisten). Ältere gespeicherte Layouts haben
+ * keine Grid-Koordinaten und werden beim Laden verworfen — das Dashboard
+ * startet dann einmalig wieder mit dem Default-Grid.
  */
 @Injectable({ providedIn: 'root' })
 export class DashboardPreferencesService {
@@ -46,10 +61,10 @@ export class DashboardPreferencesService {
       return;
     }
     const layout = data?.layout as Partial<DashboardLayout> | undefined;
-    if (layout?.version === 1) {
+    if (layout?.version === 2) {
       this._layout.set({
-        version: 1,
-        kpis: layout.kpis ?? [],
+        version: 2,
+        items: layout.items ?? [],
         cards: layout.cards ?? [],
       });
     }

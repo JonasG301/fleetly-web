@@ -5,7 +5,7 @@ import {
   provideZoneChangeDetection,
 } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
-import { provideNativeDateAdapter } from '@angular/material/core';
+import { MAT_DATE_LOCALE, provideNativeDateAdapter } from '@angular/material/core';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { provideServiceWorker } from '@angular/service-worker';
@@ -25,6 +25,9 @@ export const appConfig: ApplicationConfig = {
     // DateAdapter sonst nicht (NG0201) — provideNativeDateAdapter() im Root-Environment-
     // Injector behebt das für alle Datepicker in der App.
     provideNativeDateAdapter(),
+    // Ohne dies formatieren Datepicker/Timepicker nach dem Browser-Default (meist en-US:
+    // M/D/YYYY, 12h AM/PM) statt deutscher Konventionen (dd.mm.yyyy, 24h).
+    { provide: MAT_DATE_LOCALE, useValue: 'de-DE' },
     provideAuth({
       supabaseUrl: environment.supabaseUrl,
       supabaseAnonKey: environment.supabaseAnonKey,
