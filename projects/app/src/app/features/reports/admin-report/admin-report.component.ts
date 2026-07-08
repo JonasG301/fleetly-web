@@ -1,6 +1,8 @@
-import { DatePipe } from '@angular/common';
+import { CurrencyPipe, DatePipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { FormBuilder, FormControl, ReactiveFormsModule } from '@angular/forms';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatNativeDateModule } from '@angular/material/core';
@@ -8,10 +10,13 @@ import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
+import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTableModule } from '@angular/material/table';
-import { endOfDay, startOfDay, startOfMonth } from 'date-fns';
+import { endOfDay, startOfDay, startOfMonth, startOfQuarter, startOfWeek } from 'date-fns';
+import { debounceTime, distinctUntilChanged } from 'rxjs';
+import { OrderMaterial } from '../../../core/models/material.model';
 import { TimeEntry } from '../../../core/models/time-entry.model';
 import { DurationPipe } from '../../../shared/pipes/duration.pipe';
 import { LoadErrorComponent } from '../../../shared/components/load-error/load-error.component';
@@ -30,11 +35,14 @@ import { ReportsService } from '../reports.service';
 @Component({
   selector: 'app-admin-report',
   imports: [
+    CurrencyPipe,
     DatePipe,
     DurationPipe,
     ReactiveFormsModule,
     MatCardModule,
     MatFormFieldModule,
+    MatInputModule,
+    MatAutocompleteModule,
     MatSelectModule,
     MatDatepickerModule,
     MatNativeDateModule,
@@ -53,6 +61,13 @@ import { ReportsService } from '../reports.service';
       </button>
     </app-page-header>
 
+    <div class="presets">
+      <button matButton (click)="setPreset('today')">Heute</button>
+      <button matButton (click)="setPreset('week')">Diese Woche</button>
+      <button matButton (click)="setPreset('month')">Dieser Monat</button>
+      <button matButton (click)="setPreset('quarter')">Dieses Quartal</button>
+    </div>
+
     <form [formGroup]="filter" class="filter-row">
       <mat-form-field appearance="outline">
         <mat-label>Zeitraum</mat-label>
@@ -63,33 +78,84 @@ import { ReportsService } from '../reports.service';
         <mat-datepicker-toggle matIconSuffix [for]="picker" />
         <mat-date-range-picker #picker />
       </mat-form-field>
+
       <mat-form-field appearance="outline">
         <mat-label>Mitarbeiter</mat-label>
-        <mat-select formControlName="userId">
-          <mat-option [value]="null">Alle</mat-option>
-          @for (p of reports.profiles(); track p.id) {
+        <input
+          matInput
+          [formControl]="employeeSearch"
+          [matAutocomplete]="empAuto"
+          placeholder="Alle — tippen zum Suchen"
+        />
+        <mat-autocomplete
+          #empAuto="matAutocomplete"
+          [displayWith]="employeeDisplay"
+          (optionSelected)="onEmployeeSelected($event.option.value)"
+        >
+          @for (p of filteredProfiles(); track p.id) {
             <mat-option [value]="p.id">{{ p.full_name }}</mat-option>
           }
-        </mat-select>
+        </mat-autocomplete>
+        @if (filter.controls.userId.value) {
+          <button matIconButton matSuffix type="button" (click)="clearEmployee()" aria-label="Zurücksetzen">
+            <mat-icon>close</mat-icon>
+          </button>
+        }
       </mat-form-field>
+
       <mat-form-field appearance="outline">
         <mat-label>Auftrag</mat-label>
-        <mat-select formControlName="orderId">
-          <mat-option [value]="null">Alle</mat-option>
-          @for (o of orders.orders(); track o.id) {
-            <mat-option [value]="o.id">{{ o.order_number }}</mat-option>
+        <input
+          matInput
+          [formControl]="orderSearch"
+          [matAutocomplete]="orderAuto"
+          placeholder="Alle — Auftragsnr. / Kunde"
+        />
+        <mat-autocomplete
+          #orderAuto="matAutocomplete"
+          [displayWith]="orderDisplay"
+          (optionSelected)="onOrderSelected($event.option.value)"
+        >
+          @for (o of filteredOrders(); track o.id) {
+            <mat-option [value]="o.id">
+              {{ o.order_number }} · {{ customerName(o) }}
+              @if (o.status === 'done') {
+                <span class="done-tag">· abgeschlossen</span>
+              }
+            </mat-option>
           }
-        </mat-select>
+        </mat-autocomplete>
+        @if (filter.controls.orderId.value) {
+          <button matIconButton matSuffix type="button" (click)="clearOrder()" aria-label="Zurücksetzen">
+            <mat-icon>close</mat-icon>
+          </button>
+        }
       </mat-form-field>
+
       <mat-form-field appearance="outline">
         <mat-label>Fahrzeug</mat-label>
-        <mat-select formControlName="vehicleId">
-          <mat-option [value]="null">Alle</mat-option>
-          @for (v of fleet.vehicles(); track v.id) {
-            <mat-option [value]="v.id">{{ v.plate }}</mat-option>
+        <input
+          matInput
+          [formControl]="vehicleSearch"
+          [matAutocomplete]="vehAuto"
+          placeholder="Alle — Kennzeichen"
+        />
+        <mat-autocomplete
+          #vehAuto="matAutocomplete"
+          [displayWith]="vehicleDisplay"
+          (optionSelected)="onVehicleSelected($event.option.value)"
+        >
+          @for (v of filteredVehicles(); track v.id) {
+            <mat-option [value]="v.id">{{ v.plate }} — {{ v.make }} {{ v.model }}</mat-option>
           }
-        </mat-select>
+        </mat-autocomplete>
+        @if (filter.controls.vehicleId.value) {
+          <button matIconButton matSuffix type="button" (click)="clearVehicle()" aria-label="Zurücksetzen">
+            <mat-icon>close</mat-icon>
+          </button>
+        }
       </mat-form-field>
+
       <mat-form-field appearance="outline">
         <mat-label>Kommission</mat-label>
         <mat-select formControlName="commissionCodeId">
@@ -104,8 +170,16 @@ import { ReportsService } from '../reports.service';
     <div class="sums">
       <mat-card class="sum-card">
         <span class="sum-value">{{ totalSeconds() | duration }}</span>
-        <span>Gesamt im Zeitraum</span>
+        <span>Stunden gesamt</span>
       </mat-card>
+      @if (materialTotal() > 0) {
+        <mat-card class="sum-card">
+          <span class="sum-value material">
+            {{ materialTotal() | currency: 'EUR' : 'symbol' : '1.2-2' : 'de' }}
+          </span>
+          <span>Materialkosten gesamt</span>
+        </mat-card>
+      }
       @for (group of sumsByEmployee(); track group.key) {
         <mat-card class="sum-card">
           <span class="sum-value">{{ group.seconds | duration }}</span>
@@ -216,8 +290,58 @@ import { ReportsService } from '../reports.service';
     @if (!reports.loading() && !loadError() && reports.entries().length === 0) {
       <p class="empty">Keine Zeiteinträge für die gewählten Filter.</p>
     }
+
+    <h2 class="section-title">Material</h2>
+    @if (reports.materials().length === 0) {
+      <p class="empty">Kein Material für die gewählten Filter gebucht.</p>
+    } @else {
+      <div class="table-scroll">
+        <table mat-table [dataSource]="reports.materials()" class="mat-elevation-z1">
+          <ng-container matColumnDef="mdate">
+            <th mat-header-cell *matHeaderCellDef>Datum</th>
+            <td mat-cell *matCellDef="let m">{{ m.created_at | date: 'dd.MM.yyyy' }}</td>
+          </ng-container>
+          <ng-container matColumnDef="morder">
+            <th mat-header-cell *matHeaderCellDef>Auftrag</th>
+            <td mat-cell *matCellDef="let m">{{ materialOrderNumber(m) }}</td>
+          </ng-container>
+          <ng-container matColumnDef="memployee">
+            <th mat-header-cell *matHeaderCellDef>Mitarbeiter</th>
+            <td mat-cell *matCellDef="let m">{{ materialEmployee(m) }}</td>
+          </ng-container>
+          <ng-container matColumnDef="article">
+            <th mat-header-cell *matHeaderCellDef>Artikel</th>
+            <td mat-cell *matCellDef="let m">{{ m.material_name }}</td>
+          </ng-container>
+          <ng-container matColumnDef="qty">
+            <th mat-header-cell *matHeaderCellDef class="num">Menge</th>
+            <td mat-cell *matCellDef="let m" class="num">{{ m.quantity }} {{ m.unit }}</td>
+          </ng-container>
+          <ng-container matColumnDef="price">
+            <th mat-header-cell *matHeaderCellDef class="num">Einzelpreis</th>
+            <td mat-cell *matCellDef="let m" class="num">
+              {{ m.unit_price | currency: 'EUR' : 'symbol' : '1.2-2' : 'de' }}
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="total">
+            <th mat-header-cell *matHeaderCellDef class="num">Summe</th>
+            <td mat-cell *matCellDef="let m" class="num">
+              {{ materialLineTotal(m) | currency: 'EUR' : 'symbol' : '1.2-2' : 'de' }}
+            </td>
+          </ng-container>
+          <tr mat-header-row *matHeaderRowDef="materialColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: materialColumns"></tr>
+        </table>
+      </div>
+    }
   `,
   styles: `
+    .presets {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
     .filter-row {
       display: flex;
       gap: 12px;
@@ -244,6 +368,21 @@ import { ReportsService } from '../reports.service';
       font-size: 22px;
       font-weight: 700;
       color: var(--hugo-status-ok);
+    }
+    .sum-value.material {
+      color: var(--hugo-accent);
+    }
+    .section-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin: 28px 0 12px;
+    }
+    .done-tag {
+      color: var(--hugo-ink-muted);
+      font-size: 12px;
+    }
+    .num {
+      text-align: right;
     }
     .breakdowns {
       display: grid;
@@ -338,6 +477,7 @@ export class AdminReportComponent {
   private readonly fb = inject(FormBuilder);
 
   readonly columns = ['date', 'employee', 'order', 'vehicle', 'code', 'time', 'duration', 'note', 'actions'];
+  readonly materialColumns = ['mdate', 'morder', 'memployee', 'article', 'qty', 'price', 'total'];
   readonly loadError = signal<string | null>(null);
 
   readonly filter = this.fb.group({
@@ -349,8 +489,115 @@ export class AdminReportComponent {
     commissionCodeId: [null as string | null],
   });
 
+  // ── Suchbare Auswahl (Autocomplete) ────────────────────────────────────
+  // Eigene Text-Controls, damit Tippen NICHT sofort neu lädt — erst die
+  // Auswahl einer Option spiegelt die ID in `filter` und löst das Neuladen aus.
+  readonly employeeSearch = new FormControl('', { nonNullable: true });
+  readonly orderSearch = new FormControl('', { nonNullable: true });
+  readonly vehicleSearch = new FormControl('', { nonNullable: true });
+
+  private readonly employeeQuery = toSignal(this.employeeSearch.valueChanges, { initialValue: '' });
+  private readonly orderQuery = toSignal(this.orderSearch.valueChanges, { initialValue: '' });
+  private readonly vehicleQuery = toSignal(this.vehicleSearch.valueChanges, { initialValue: '' });
+
+  /** Der Freitext ist die getippte Suche — außer er ist bereits eine gewählte ID. */
+  private searchTerm(raw: string, isId: (id: string) => boolean): string {
+    return (isId(raw) ? '' : raw).toLowerCase().trim();
+  }
+
+  readonly filteredProfiles = computed(() => {
+    const list = this.reports.profiles();
+    const q = this.searchTerm(this.employeeQuery(), (id) => list.some((p) => p.id === id));
+    const matched = q ? list.filter((p) => (p.full_name ?? '').toLowerCase().includes(q)) : list;
+    return matched.slice(0, 50);
+  });
+
+  readonly filteredOrders = computed(() => {
+    const list = this.orders.orders();
+    const q = this.searchTerm(this.orderQuery(), (id) => list.some((o) => o.id === id));
+    const matched = q
+      ? list.filter(
+          (o) =>
+            o.order_number.toLowerCase().includes(q) ||
+            this.customerName(o).toLowerCase().includes(q),
+        )
+      : list;
+    // Offene/aktive Aufträge zuerst, abgeschlossene ans Ende (stabile Sortierung
+    // erhält die Reihenfolge nach Erstelldatum innerhalb der Gruppen).
+    const ranked = [...matched].sort(
+      (a, b) => (a.status === 'done' ? 1 : 0) - (b.status === 'done' ? 1 : 0),
+    );
+    return ranked.slice(0, 50);
+  });
+
+  readonly filteredVehicles = computed(() => {
+    const list = this.fleet.vehicles();
+    const q = this.searchTerm(this.vehicleQuery(), (id) => list.some((v) => v.id === id));
+    const matched = q
+      ? list.filter(
+          (v) =>
+            v.plate.toLowerCase().includes(q) ||
+            `${v.make} ${v.model}`.toLowerCase().includes(q),
+        )
+      : list;
+    return matched.slice(0, 50);
+  });
+
+  readonly employeeDisplay = (id: string): string =>
+    this.reports.profiles().find((p) => p.id === id)?.full_name ?? id ?? '';
+  readonly orderDisplay = (id: string): string =>
+    this.orders.orders().find((o) => o.id === id)?.order_number ?? id ?? '';
+  readonly vehicleDisplay = (id: string): string =>
+    this.fleet.vehicles().find((v) => v.id === id)?.plate ?? id ?? '';
+
+  customerName(o: { customer_id: string }): string {
+    return this.customers.customers().find((c) => c.id === o.customer_id)?.company_name ?? '';
+  }
+
+  onEmployeeSelected(id: string): void {
+    this.filter.controls.userId.setValue(id || null);
+  }
+  onOrderSelected(id: string): void {
+    this.filter.controls.orderId.setValue(id || null);
+  }
+  onVehicleSelected(id: string): void {
+    this.filter.controls.vehicleId.setValue(id || null);
+  }
+
+  clearEmployee(): void {
+    this.employeeSearch.setValue('');
+    this.filter.controls.userId.setValue(null);
+  }
+  clearOrder(): void {
+    this.orderSearch.setValue('');
+    this.filter.controls.orderId.setValue(null);
+  }
+  clearVehicle(): void {
+    this.vehicleSearch.setValue('');
+    this.filter.controls.vehicleId.setValue(null);
+  }
+
+  /** Schnellauswahl des Zeitraums; patchValue löst ein einzelnes (entprelltes) Neuladen aus. */
+  setPreset(preset: 'today' | 'week' | 'month' | 'quarter'): void {
+    const now = new Date();
+    const from =
+      preset === 'today'
+        ? startOfDay(now)
+        : preset === 'week'
+          ? startOfWeek(now, { weekStartsOn: 1 })
+          : preset === 'month'
+            ? startOfMonth(now)
+            : startOfQuarter(now);
+    this.filter.patchValue({ from, to: now });
+  }
+
   readonly totalSeconds = computed(() =>
     this.reports.entries().reduce((sum, e) => sum + (e.duration_seconds ?? 0), 0),
+  );
+
+  /** Summe aller Materialkosten im Zeitraum (Menge × Einzelpreis). */
+  readonly materialTotal = computed(() =>
+    this.reports.materials().reduce((sum, m) => sum + this.materialLineTotal(m), 0),
   );
 
   /** Summen je Mitarbeiter (US-15). */
@@ -422,7 +669,15 @@ export class AdminReportComponent {
     void this.codes.load();
     void this.customers.load();
     void this.load();
-    this.filter.valueChanges.subscribe(() => void this.load());
+    // Entprellt (300 ms) und dubletten-frei, damit schnelle Änderungen
+    // (Datum tippen, Presets, Auswahl) nicht mehrfach hintereinander laden.
+    this.filter.valueChanges
+      .pipe(
+        debounceTime(300),
+        distinctUntilChanged((a, b) => JSON.stringify(a) === JSON.stringify(b)),
+        takeUntilDestroyed(),
+      )
+      .subscribe(() => void this.load());
   }
 
   async load(): Promise<void> {
@@ -456,6 +711,20 @@ export class AdminReportComponent {
 
   codeLabel(e: TimeEntry): string {
     return this.codes.codes().find((c) => c.id === e.commission_code_id)?.code ?? '–';
+  }
+
+  materialLineTotal(m: OrderMaterial): number {
+    return m.unit_price * m.quantity;
+  }
+
+  materialOrderNumber(m: OrderMaterial): string {
+    return this.orders.orders().find((o) => o.id === m.order_id)?.order_number ?? '–';
+  }
+
+  materialEmployee(m: OrderMaterial): string {
+    return m.created_by
+      ? (this.reports.profiles().find((p) => p.id === m.created_by)?.full_name ?? '–')
+      : '–';
   }
 
   correct(entry: TimeEntry): void {

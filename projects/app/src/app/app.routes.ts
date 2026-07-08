@@ -59,6 +59,11 @@ export const routes: Routes = [
           import('./features/commission-codes/commission-codes.routes').then((m) => m.routes),
       },
       {
+        path: 'material',
+        canActivate: [adminGuard],
+        loadChildren: () => import('./features/materials/materials.routes').then((m) => m.routes),
+      },
+      {
         path: 'zeiterfassung',
         loadChildren: () =>
           import('./features/time-tracking/time-tracking.routes').then((m) => m.stampRoutes),

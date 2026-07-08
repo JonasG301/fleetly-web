@@ -1,4 +1,4 @@
-import { DatePipe } from '@angular/common';
+import { CurrencyPipe, DatePipe } from '@angular/common';
 import { Component, computed, effect, inject, input, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
@@ -7,6 +7,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatListModule } from '@angular/material/list';
 import { AuthService } from 'auth';
+import { OrderMaterial } from '../../../core/models/material.model';
 import { ORDER_STATUS_LABELS } from '../../../core/models/order.model';
 import { confirmDialog } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { LicensePlateComponent } from '../../../shared/components/license-plate/license-plate.component';
@@ -17,12 +18,15 @@ import { CustomersService } from '../../customers/customers.service';
 import { FleetService } from '../../fleet/fleet.service';
 import { ReportsService } from '../../reports/reports.service';
 import { OrderFormComponent } from '../order-form/order-form.component';
+import { OrderMaterialsService } from '../order-materials.service';
 import { OrderWithVehicles, OrdersService } from '../orders.service';
+import { OrderMaterialDialogComponent } from './order-material-dialog.component';
 
 /** Auftrags-Detail: Kunde, Fahrzeuge, Zeiterfassung je Mitarbeiter. */
 @Component({
   selector: 'app-order-detail',
   imports: [
+    CurrencyPipe,
     DatePipe,
     DurationPipe,
     RouterLink,
@@ -101,17 +105,17 @@ import { OrderWithVehicles, OrdersService } from '../orders.service';
             @if (vehicles().length === 0) {
               <p class="empty">Keine Fahrzeuge zugeordnet.</p>
             }
-            <mat-list>
+            <div class="vehicle-list">
               @for (v of vehicles(); track v.id) {
-                <a [routerLink]="['/fuhrpark', v.id]" class="row-link">
-                  <mat-list-item lines="2">
-                    <app-license-plate matListItemIcon [plate]="v.plate" size="sm" />
-                    <span matListItemTitle>{{ v.make }} {{ v.model }}</span>
-                    <span matListItemLine>{{ v.internal_name ?? '–' }}</span>
-                  </mat-list-item>
+                <a [routerLink]="['/fuhrpark', v.id]" class="vehicle-row row-link">
+                  <app-license-plate [plate]="v.plate" size="sm" />
+                  <span class="vehicle-info">
+                    <span class="vehicle-title">{{ v.make }} {{ v.model }}</span>
+                    <span class="vehicle-sub">{{ v.internal_name ?? '–' }}</span>
+                  </span>
                 </a>
               }
-            </mat-list>
+            </div>
           </mat-card-content>
         </mat-card>
 
@@ -149,6 +153,55 @@ import { OrderWithVehicles, OrdersService } from '../orders.service';
             }
           </mat-card-content>
         </mat-card>
+
+        <mat-card class="material-card">
+          <mat-card-header>
+            <mat-card-title>Material</mat-card-title>
+            @if (o.status !== 'done') {
+              <button matButton="filled" (click)="addMaterial()">
+                <mat-icon>add</mat-icon>
+                Material buchen
+              </button>
+            }
+          </mat-card-header>
+          <mat-card-content>
+            @if (materialEntries().length === 0) {
+              <p class="empty">Kein Material gebucht.</p>
+            } @else {
+              <div class="sum-row">
+                <div class="sum-card">
+                  <span class="sum-value">
+                    {{ materialTotal() | currency: 'EUR' : 'symbol' : '1.2-2' : 'de' }}
+                  </span>
+                  <span>Materialkosten gesamt</span>
+                </div>
+              </div>
+              <mat-list>
+                @for (m of materialEntries(); track m.id) {
+                  <mat-list-item lines="2">
+                    <mat-icon matListItemIcon>inventory_2</mat-icon>
+                    <span matListItemTitle>{{ m.material_name }}</span>
+                    <span matListItemLine>
+                      {{ m.quantity }} {{ m.unit }} ×
+                      {{ m.unit_price | currency: 'EUR' : 'symbol' : '1.2-2' : 'de' }} =
+                      {{ lineTotal(m) | currency: 'EUR' : 'symbol' : '1.2-2' : 'de' }}
+                    </span>
+                    @if (canRemove(m)) {
+                      <button
+                        matListItemMeta
+                        matIconButton
+                        (click)="removeMaterial(m)"
+                        aria-label="Buchung löschen"
+                      >
+                        <mat-icon>delete</mat-icon>
+                      </button>
+                    }
+                  </mat-list-item>
+                }
+              </mat-list>
+            }
+          </mat-card-content>
+        </mat-card>
       </div>
     }
   `,
@@ -159,7 +212,8 @@ import { OrderWithVehicles, OrdersService } from '../orders.service';
       gap: 16px;
       align-items: start;
     }
-    .time-card {
+    .time-card,
+    .material-card {
       grid-column: 1 / -1;
     }
     mat-card-header {
@@ -185,6 +239,35 @@ import { OrderWithVehicles, OrdersService } from '../orders.service';
     .row-link {
       color: inherit;
       text-decoration: none;
+    }
+    .vehicle-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .vehicle-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 4px;
+      border-radius: 8px;
+    }
+    .vehicle-row:hover {
+      background: var(--hugo-hairline);
+    }
+    .vehicle-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+    .vehicle-title {
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .vehicle-sub {
+      font-size: 13px;
+      color: var(--hugo-ink-muted);
     }
     .sum-row {
       display: flex;
@@ -233,6 +316,7 @@ export class OrderDetailComponent {
   private readonly fleet = inject(FleetService);
   readonly reports = inject(ReportsService);
   readonly auth = inject(AuthService);
+  private readonly orderMaterials = inject(OrderMaterialsService);
   private readonly dialog = inject(MatDialog);
 
   readonly id = input.required<string>();
@@ -277,6 +361,11 @@ export class OrderDetailComponent {
     }));
   });
 
+  readonly materialEntries = computed(() => this.orderMaterials.entries());
+  readonly materialTotal = computed(() =>
+    this.materialEntries().reduce((sum, m) => sum + this.lineTotal(m), 0),
+  );
+
   readonly timeLoadError = signal<string | null>(null);
 
   constructor() {
@@ -290,7 +379,32 @@ export class OrderDetailComponent {
     // Input gesetzt ist, und erneut bei jeder Änderung von `id()`.
     effect(() => {
       void this.loadTimeEntries(this.id());
+      void this.orderMaterials.loadForOrder(this.id());
     });
+  }
+
+  lineTotal(m: OrderMaterial): number {
+    return m.unit_price * m.quantity;
+  }
+
+  /** Eigene Buchung oder Admin — deckt sich mit der RLS-Policy. */
+  canRemove(m: OrderMaterial): boolean {
+    return this.auth.isAdmin() || m.created_by === this.auth.user()?.id;
+  }
+
+  addMaterial(): void {
+    this.dialog.open(OrderMaterialDialogComponent, { data: this.id() });
+  }
+
+  async removeMaterial(m: OrderMaterial): Promise<void> {
+    const ok = await confirmDialog(this.dialog, {
+      title: 'Buchung löschen',
+      message: `Material „${m.material_name}" aus dem Auftrag entfernen?`,
+      confirmLabel: 'Löschen',
+    });
+    if (ok) {
+      await this.orderMaterials.remove(m.id, this.id());
+    }
   }
 
   async loadTimeEntries(orderId: string): Promise<void> {
