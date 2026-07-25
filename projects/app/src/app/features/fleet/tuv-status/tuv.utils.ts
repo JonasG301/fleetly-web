@@ -1,8 +1,13 @@
-import { addYears, differenceInCalendarDays, endOfMonth, format } from 'date-fns';
+import { addMonths, differenceInCalendarDays, endOfMonth, format } from 'date-fns';
+import {
+  effectiveHuIntervalMonths,
+  Vehicle,
+  VehicleCategory,
+} from '../../../core/models/vehicle.model';
 
 /**
- * TÜV-Statusberechnung — Businessregel aus der Fleetly-Flutter-App:
- * - Nächste HU = letzte HU + (schneller als 40 km/h ? 1 Jahr : 2 Jahre)
+ * TÜV-Statusberechnung:
+ * - Nächste HU = letzte HU + Kategorie-Intervall (siehe effectiveHuIntervalMonths)
  * - Fälligkeitsmonat = Monat der nächsten HU; gültig bis Monatsende
  * - Überfällig ab dem 1. des FOLGEmonats
  * - Warnschwellen: 30 / 7 / 1 Tage vor Monatsende
@@ -22,20 +27,16 @@ export interface TuvInfo {
   dueMonthLabel: string | null;
 }
 
-export function tuvIntervalYears(isFasterThan40Kmh: boolean): number {
-  return isFasterThan40Kmh ? 1 : 2;
-}
-
 export function calcTuvInfo(
   tuvDate: string | Date | null | undefined,
-  isFasterThan40Kmh: boolean,
+  intervalMonths: number | null,
   today: Date = new Date(),
 ): TuvInfo {
-  if (!tuvDate) {
+  if (!tuvDate || intervalMonths == null) {
     return { status: 'unknown', nextDue: null, dueMonthEnd: null, daysRemaining: null, dueMonthLabel: null };
   }
   const last = typeof tuvDate === 'string' ? new Date(tuvDate) : tuvDate;
-  const nextDue = addYears(last, tuvIntervalYears(isFasterThan40Kmh));
+  const nextDue = addMonths(last, intervalMonths);
   const dueMonthEnd = endOfMonth(nextDue);
   const daysRemaining = differenceInCalendarDays(dueMonthEnd, today);
   const dueMonthLabel = format(nextDue, 'MM/yyyy');
@@ -51,6 +52,21 @@ export function calcTuvInfo(
     status = 'valid';
   }
   return { status, nextDue, dueMonthEnd, daysRemaining, dueMonthLabel };
+}
+
+/** Ermittelt das HU-Intervall eines Fahrzeugs (Kategorie-Regeln) und berechnet direkt den Status. */
+export function tuvInfoForVehicle(
+  vehicle: Pick<Vehicle, 'tuv_date' | 'type' | 'first_registration' | 'max_weight_kg'>,
+  today: Date = new Date(),
+): TuvInfo {
+  const category = (vehicle.type as VehicleCategory | null) ?? 'sonstiges';
+  const intervalMonths = effectiveHuIntervalMonths(
+    category,
+    vehicle.first_registration,
+    vehicle.max_weight_kg,
+    today,
+  );
+  return calcTuvInfo(vehicle.tuv_date, intervalMonths, today);
 }
 
 export const TUV_STATUS_LABELS: Record<TuvStatus, string> = {

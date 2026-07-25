@@ -29,12 +29,13 @@ import {
 } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { SupabaseService } from '../../core/services/supabase.service';
+import { VehicleCategory, VEHICLE_CATEGORY_RULES } from '../../core/models/vehicle.model';
 import { DurationPipe } from '../../shared/pipes/duration.pipe';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { CalendarEntriesService } from '../calendar/calendar-entries.service';
 import { DamageReportService } from '../fleet/damage-report/damage-report.service';
 import { FleetService } from '../fleet/fleet.service';
-import { calcTuvInfo } from '../fleet/tuv-status/tuv.utils';
+import { tuvInfoForVehicle } from '../fleet/tuv-status/tuv.utils';
 import { OrdersService } from '../orders/orders.service';
 import { DashboardPreferencesService, GridWidgetPref, WidgetPref } from './dashboard-preferences.service';
 
@@ -740,13 +741,15 @@ export class DashboardComponent {
 
   /** HU-Status aller aktiven Fahrzeuge als Ampel-Balken. */
   readonly tuvBar = computed<HealthBar>(() => {
-    const vehicles = this.fleet.vehicles().filter((v) => v.is_active);
+    const vehicles = this.fleet
+      .vehicles()
+      .filter((v) => v.is_active && VEHICLE_CATEGORY_RULES[(v.type as VehicleCategory | null) ?? 'sonstiges'].huApplicable);
     let critical = 0;
     let warn = 0;
     let ok = 0;
     let unknown = 0;
     for (const v of vehicles) {
-      switch (calcTuvInfo(v.tuv_date, v.is_faster_than_40kmh).status) {
+      switch (tuvInfoForVehicle(v).status) {
         case 'expired':
         case 'due_7':
           critical++;
@@ -854,12 +857,12 @@ export class DashboardComponent {
     const events: UpcomingEvent[] = [];
 
     for (const v of this.fleet.vehicles().filter((v) => v.is_active)) {
-      const tuv = calcTuvInfo(v.tuv_date, v.is_faster_than_40kmh, today);
+      const tuv = tuvInfoForVehicle(v, today);
       if (tuv.dueMonthEnd && (tuv.daysRemaining ?? Infinity) <= EVENT_HORIZON_DAYS) {
         events.push({
           date: tuv.dueMonthEnd,
           label: 'HU fällig',
-          sub: v.plate,
+          sub: v.plate ?? v.internal_name ?? '',
           route: '/fuhrpark/tuv',
           icon: 'verified',
         });
@@ -871,7 +874,7 @@ export class DashboardComponent {
         events.push({
           date: new Date(v.next_service_date),
           label: 'Service fällig',
-          sub: v.plate,
+          sub: v.plate ?? v.internal_name ?? '',
           route: `/fuhrpark/${v.id}`,
           icon: 'build_circle',
         });
@@ -883,7 +886,7 @@ export class DashboardComponent {
         events.push({
           date: new Date(v.leasing_end),
           label: 'Leasing-Ende',
-          sub: v.plate,
+          sub: v.plate ?? v.internal_name ?? '',
           route: `/fuhrpark/${v.id}`,
           icon: 'directions_car',
         });

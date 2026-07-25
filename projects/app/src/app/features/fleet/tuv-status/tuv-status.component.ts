@@ -4,12 +4,17 @@ import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatTableModule } from '@angular/material/table';
-import { Vehicle } from '../../../core/models/vehicle.model';
+import {
+  effectiveHuIntervalMonths,
+  Vehicle,
+  VehicleCategory,
+  VEHICLE_CATEGORY_RULES,
+} from '../../../core/models/vehicle.model';
 import { LicensePlateComponent } from '../../../shared/components/license-plate/license-plate.component';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { TuvStatusChipComponent } from '../../../shared/components/status-chip/tuv-status-chip.component';
 import { FleetService } from '../fleet.service';
-import { TuvInfo, calcTuvInfo, tuvSortKey } from './tuv.utils';
+import { TuvInfo, tuvInfoForVehicle, tuvSortKey } from './tuv.utils';
 
 interface TuvRow {
   vehicle: Vehicle;
@@ -83,7 +88,7 @@ interface TuvRow {
       <ng-container matColumnDef="interval">
         <th mat-header-cell *matHeaderCellDef>Intervall</th>
         <td mat-cell *matCellDef="let r">
-          {{ r.vehicle.is_faster_than_40kmh ? '1 Jahr' : '2 Jahre' }}
+          {{ intervalLabel(r.vehicle) }}
         </td>
       </ng-container>
       <ng-container matColumnDef="dueMonth">
@@ -141,10 +146,10 @@ export class TuvStatusComponent {
   readonly rows = computed<TuvRow[]>(() =>
     this.fleet
       .vehicles()
-      .filter((v) => v.is_active)
+      .filter((v) => v.is_active && VEHICLE_CATEGORY_RULES[(v.type as VehicleCategory | null) ?? 'sonstiges'].huApplicable)
       .map((vehicle) => ({
         vehicle,
-        info: calcTuvInfo(vehicle.tuv_date, vehicle.is_faster_than_40kmh),
+        info: tuvInfoForVehicle(vehicle),
       }))
       .sort((a, b) => tuvSortKey(a.info) - tuvSortKey(b.info)),
   );
@@ -161,5 +166,15 @@ export class TuvStatusComponent {
 
   constructor() {
     void this.fleet.load();
+  }
+
+  intervalLabel(vehicle: Vehicle): string {
+    const months = effectiveHuIntervalMonths(
+      (vehicle.type as VehicleCategory | null) ?? 'sonstiges',
+      vehicle.first_registration,
+      vehicle.max_weight_kg,
+    );
+    if (months == null) return '–';
+    return months % 12 === 0 ? `${months / 12} Jahr(e)` : `${months} Monate`;
   }
 }

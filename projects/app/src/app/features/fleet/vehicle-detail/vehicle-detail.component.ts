@@ -10,7 +10,7 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { AuthService } from 'auth';
 import { DAMAGE_STATUS_LABELS, DamageReport } from '../../../core/models/damage-report.model';
-import { FUEL_TYPE_LABELS } from '../../../core/models/vehicle.model';
+import { effectiveHuIntervalMonths, FUEL_TYPE_LABELS, VehicleCategory } from '../../../core/models/vehicle.model';
 import { ORDER_STATUS_LABELS } from '../../../core/models/order.model';
 import { ServiceEntry } from '../../../core/models/service-entry.model';
 import { confirmDialog } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
@@ -24,7 +24,7 @@ import { DamageReportService } from '../damage-report/damage-report.service';
 import { VehicleDamageOverviewComponent } from '../damage-report/vehicle-damage-overview.component';
 import { FleetService } from '../fleet.service';
 import { ServiceEntryDialogComponent } from '../service-history/service-entry-dialog.component';
-import { calcTuvInfo } from '../tuv-status/tuv.utils';
+import { calcTuvInfo, tuvInfoForVehicle } from '../tuv-status/tuv.utils';
 
 /** Fahrzeug-Detail: Stammdaten, TÜV-Karte, Service-Historie, Schäden. */
 @Component({
@@ -76,7 +76,7 @@ import { calcTuvInfo } from '../tuv-status/tuv.utils';
               <dt>Nächste HU fällig</dt>
               <dd>{{ tuvInfo().dueMonthLabel ?? '–' }}</dd>
               <dt>Intervall</dt>
-              <dd>{{ v.is_faster_than_40kmh ? '1 Jahr (> 40 km/h)' : '2 Jahre (≤ 40 km/h)' }}</dd>
+              <dd>{{ huIntervalLabel() }}</dd>
               <dt>Letzte UVV</dt>
               <dd>{{ v.uvv_date ? (v.uvv_date | date: 'dd.MM.yyyy') : '–' }}</dd>
             </dl>
@@ -312,7 +312,18 @@ export class VehicleDetailComponent {
   readonly vehicle = computed(() => this.fleet.byId(this.id()));
   readonly tuvInfo = computed(() => {
     const v = this.vehicle();
-    return calcTuvInfo(v?.tuv_date ?? null, v?.is_faster_than_40kmh ?? true);
+    return v ? tuvInfoForVehicle(v) : calcTuvInfo(null, null);
+  });
+  readonly huIntervalLabel = computed(() => {
+    const v = this.vehicle();
+    if (!v) return '–';
+    const months = effectiveHuIntervalMonths(
+      (v.type as VehicleCategory | null) ?? 'sonstiges',
+      v.first_registration,
+      v.max_weight_kg,
+    );
+    if (months == null) return 'Keine HU-Pflicht';
+    return months % 12 === 0 ? `${months / 12} Jahr(e)` : `${months} Monate`;
   });
   readonly customerName = computed(() => {
     const cid = this.vehicle()?.customer_id;

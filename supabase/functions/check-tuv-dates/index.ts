@@ -1,13 +1,44 @@
 // Fleetly-Feature: Täglicher Cron — TÜV-Fälligkeiten prüfen und Web Push senden.
-// Businessregel (aus der Flutter-App):
-//   nächste HU = tuv_date + (is_faster_than_40kmh ? 1 : 2 Jahre)
-//   gültig bis Ende des Fälligkeitsmonats, überfällig ab dem 1. des Folgemonats
-//   Schwellen: 30 / 7 / 1 Tage vor Monatsende, danach "expired"
+// Businessregel (Kategorie-Regeln, siehe projects/app/.../core/models/vehicle.model.ts
+// effectiveHuIntervalMonths — hier dupliziert, da Edge Functions kein Frontend-Bundling teilen):
+//   PKW: 24 Monate, außer Neuwagen (Erstzulassung < 3 Jahre) → 36 Monate
+//   LKW: ≤ 3.500 kg → 24 Monate, sonst 12 Monate
+//   Traktor/Anhänger/Bagger/Radlader/Walze/Teleskoplader/Sonstiges: 24 Monate
+//   Stapler: keine HU-Pflicht (kein Cron-Eintrag)
+//   nächste HU = tuv_date + Intervall, gültig bis Ende des Fälligkeitsmonats,
+//   überfällig ab dem 1. des Folgemonats. Schwellen: 30 / 7 / 1 Tage vor Monatsende.
 // Dedup über tuv_notifications (UNIQUE vehicle_id + threshold + due_date).
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { PushSubscriptionJson, sendPush } from '../_shared/web-push.ts';
 
 type Threshold = '30d' | '7d' | '1d' | 'expired';
+
+const MAX_WEIGHT_HU_THRESHOLD_KG = 3500;
+
+function isNeuwagen(firstRegistration: string | null, today: Date): boolean {
+  if (!firstRegistration) return false;
+  const fr = new Date(firstRegistration);
+  const threeYearsAfter = new Date(fr.getFullYear() + 3, fr.getMonth(), fr.getDate());
+  return today < threeYearsAfter;
+}
+
+function huIntervalMonths(
+  category: string | null,
+  firstRegistration: string | null,
+  maxWeightKg: number | null,
+  today: Date,
+): number | null {
+  switch (category) {
+    case 'stapler':
+      return null;
+    case 'pkw':
+      return isNeuwagen(firstRegistration, today) ? 36 : 24;
+    case 'lkw':
+      return maxWeightKg != null && maxWeightKg <= MAX_WEIGHT_HU_THRESHOLD_KG ? 24 : 12;
+    default:
+      return 24;
+  }
+}
 
 function endOfMonth(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
@@ -47,7 +78,7 @@ Deno.serve(async () => {
   // Empfänger benötigt.
   const { data: vehicles, error } = await supabase
     .from('vehicles')
-    .select('id, plate, is_faster_than_40kmh, tuv_date, org_id')
+    .select('id, plate, type, first_registration, max_weight_kg, tuv_date, org_id')
     .eq('is_active', true)
     .not('tuv_date', 'is', null);
   if (error) {
@@ -66,9 +97,12 @@ Deno.serve(async () => {
   let sent = 0;
 
   for (const v of vehicles ?? []) {
+    const months = huIntervalMonths(v.type, v.first_registration, v.max_weight_kg, now);
+    if (months == null) {
+      continue;
+    }
     const last = new Date(v.tuv_date as string);
-    const years = v.is_faster_than_40kmh ? 1 : 2;
-    const nextDue = new Date(last.getFullYear() + years, last.getMonth(), last.getDate());
+    const nextDue = new Date(last.getFullYear(), last.getMonth() + months, last.getDate());
     const dueEnd = endOfMonth(nextDue);
     const daysRemaining = daysBetween(now, dueEnd);
     const threshold = thresholdFor(daysRemaining);

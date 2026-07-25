@@ -17,7 +17,7 @@ import { LicensePlateComponent } from '../../../shared/components/license-plate/
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { TuvStatusChipComponent } from '../../../shared/components/status-chip/tuv-status-chip.component';
 import { CustomersService } from '../../customers/customers.service';
-import { calcTuvInfo, TuvInfo } from '../tuv-status/tuv.utils';
+import { TuvInfo, tuvInfoForVehicle } from '../tuv-status/tuv.utils';
 import { FleetService } from '../fleet.service';
 
 interface VehicleRow extends Vehicle {
@@ -282,13 +282,13 @@ export class VehicleListComponent {
       .filter(
         (v) =>
           !term ||
-          v.plate.toLowerCase().includes(term) ||
+          (v.plate ?? '').toLowerCase().includes(term) ||
           (v.internal_name ?? '').toLowerCase().includes(term) ||
           `${v.make} ${v.model}`.toLowerCase().includes(term),
       )
       .map((v) => ({
         ...v,
-        tuvInfo: calcTuvInfo(v.tuv_date, v.is_faster_than_40kmh),
+        tuvInfo: tuvInfoForVehicle(v),
         customerName: v.customer_id
           ? (this.customersById().get(v.customer_id)?.company_name ?? null)
           : null,

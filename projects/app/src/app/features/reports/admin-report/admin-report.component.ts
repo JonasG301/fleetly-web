@@ -536,7 +536,7 @@ export class AdminReportComponent {
     const matched = q
       ? list.filter(
           (v) =>
-            v.plate.toLowerCase().includes(q) ||
+            (v.plate ?? '').toLowerCase().includes(q) ||
             `${v.make} ${v.model}`.toLowerCase().includes(q),
         )
       : list;

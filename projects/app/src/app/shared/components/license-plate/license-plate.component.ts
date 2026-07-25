@@ -9,19 +9,23 @@ const HU_STICKER_COLORS = ['#f5a623', '#f2e14c', '#4a90d9', '#b98ac9', '#7ac142'
 @Component({
   selector: 'app-license-plate',
   template: `
-    <span class="plate plate--{{ size() }}">
-      <span class="eu-band">
-        <span class="stars" aria-hidden="true"></span>
-        <span class="d">D</span>
-      </span>
-      <span class="plate-text">{{ plate() }}</span>
-      @if (huMonth() && huYear()) {
-        <span class="hu-sticker" [style.background]="stickerColor()">
-          <span class="hu-month">{{ huMonth() }}</span>
-          <span class="hu-year">{{ huYear() }}</span>
+    @if (plate(); as p) {
+      <span class="plate plate--{{ size() }}">
+        <span class="eu-band">
+          <span class="stars" aria-hidden="true"></span>
+          <span class="d">D</span>
         </span>
-      }
-    </span>
+        <span class="plate-text">{{ p }}</span>
+        @if (huMonth() && huYear()) {
+          <span class="hu-sticker" [style.background]="stickerColor()">
+            <span class="hu-month">{{ huMonth() }}</span>
+            <span class="hu-year">{{ huYear() }}</span>
+          </span>
+        }
+      </span>
+    } @else {
+      <span class="plate plate--{{ size() }} plate--none">Kein Kennzeichen</span>
+    }
   `,
   styles: `
     .plate {
@@ -110,10 +114,18 @@ const HU_STICKER_COLORS = ['#f5a623', '#f2e14c', '#4a90d9', '#b98ac9', '#7ac142'
       width: 14px;
       height: 8px;
     }
+    .plate--none {
+      padding: 0 8px;
+      font-size: 12px;
+      font-style: italic;
+      color: var(--hugo-ink-muted, #666);
+      background: transparent;
+      border-style: dashed;
+    }
   `,
 })
 export class LicensePlateComponent {
-  readonly plate = input.required<string>();
+  readonly plate = input<string | null>(null);
   readonly size = input<'sm' | 'md' | 'lg'>('md');
   /** Fälligkeitsmonat/-jahr der HU als zweistellige Strings, z.B. "07" / "27" — blendet die Prüfplakette ein. */
   readonly huMonth = input<string | null>(null);

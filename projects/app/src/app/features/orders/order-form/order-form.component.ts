@@ -234,7 +234,7 @@ export class OrderFormComponent {
     return this.selectableVehicles().filter(
       (v) =>
         !selected.has(v.id) &&
-        (v.plate.toLowerCase().includes(search) ||
+        ((v.plate ?? '').toLowerCase().includes(search) ||
           v.make.toLowerCase().includes(search) ||
           v.model.toLowerCase().includes(search)),
     );

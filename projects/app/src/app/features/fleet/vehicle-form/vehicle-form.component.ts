@@ -1,8 +1,8 @@
-import { Component, computed, inject, input, signal } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Component, computed, effect, inject, input, signal } from '@angular/core';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
-import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -12,11 +12,16 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatStepperModule } from '@angular/material/stepper';
 import {
+  effectiveHuIntervalMonths,
   FUEL_TYPE_LABELS,
   FuelType,
   LICENSE_PLATE_PATTERN,
+  MAX_SPEED_PLATE_THRESHOLD_KMH,
+  requiresPlate,
   VEHICLE_CATEGORIES,
   VEHICLE_CATEGORY_LABELS,
+  VEHICLE_CATEGORY_RULES,
+  VehicleCategory,
   VehicleInsert,
 } from '../../../core/models/vehicle.model';
 import { HasUnsavedChanges } from '../../../core/guards/unsaved-changes.guard';
@@ -25,8 +30,9 @@ import { CustomersService } from '../../customers/customers.service';
 import { FleetService } from '../fleet.service';
 
 /**
- * Fahrzeug anlegen/bearbeiten als Stepper (US-06) — Schritte analog
- * zum Flutter-Wizard: Basisdaten / Technik & HU / Sonstiges.
+ * Fahrzeug anlegen/bearbeiten als Stepper (US-06) — Schritte: Fahrzeugtyp
+ * zuerst (bestimmt alle Folgefelder), dann Basisdaten / Technik & HU /
+ * Sonstiges, analog zum Flutter-Wizard.
  */
 @Component({
   selector: 'app-vehicle-form',
@@ -36,7 +42,6 @@ import { FleetService } from '../fleet.service';
     MatFormFieldModule,
     MatInputModule,
     MatSelectModule,
-    MatCheckboxModule,
     MatDatepickerModule,
     MatNativeDateModule,
     MatButtonModule,
@@ -47,9 +52,38 @@ import { FleetService } from '../fleet.service';
     <app-page-header [title]="vehicleId() ? 'Fahrzeug bearbeiten' : 'Neues Fahrzeug'" />
 
     <mat-stepper [linear]="!vehicleId()" orientation="vertical">
-      <!-- Schritt 1: Basisdaten -->
+      <!-- Schritt 1: Fahrzeugtyp -->
+      <mat-step [stepControl]="typeForm" label="Fahrzeugtyp">
+        <form [formGroup]="typeForm" class="step-form">
+          <mat-form-field appearance="outline">
+            <mat-label>Fahrzeugtyp</mat-label>
+            <mat-select formControlName="type">
+              <mat-option value="">– Kein Typ –</mat-option>
+              @for (c of categories; track c) {
+                <mat-option [value]="c">{{ categoryLabels[c] }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+          <div>
+            <button matButton="filled" matStepperNext type="button">Weiter</button>
+          </div>
+        </form>
+      </mat-step>
+
+      <!-- Schritt 2: Basisdaten -->
       <mat-step [stepControl]="baseForm" label="Basisdaten">
         <form [formGroup]="baseForm" class="step-form">
+          @if (rules().requiresMaxSpeed) {
+            <mat-form-field appearance="outline">
+              <mat-label>Bauartgeschwindigkeit</mat-label>
+              <input matInput type="number" min="0" formControlName="max_speed_kmh" />
+              <span matTextSuffix>km/h</span>
+              <mat-hint>Kennzeichen nur bei > {{ MAX_SPEED_PLATE_THRESHOLD_KMH }} km/h</mat-hint>
+              @if (baseForm.controls.max_speed_kmh.hasError('required')) {
+                <mat-error>Bauartgeschwindigkeit ist erforderlich (bestimmt die Kennzeichenpflicht)</mat-error>
+              }
+            </mat-form-field>
+          }
           <mat-form-field appearance="outline">
             <mat-label>Kennzeichen</mat-label>
             <input matInput formControlName="plate" placeholder="S-AB 1234" />
@@ -57,6 +91,8 @@ import { FleetService } from '../fleet.service';
               <mat-error>Kennzeichen ist erforderlich</mat-error>
             } @else if (baseForm.controls.plate.hasError('pattern')) {
               <mat-error>Format: XXX-XX 1234 (deutsches Kennzeichen)</mat-error>
+            } @else if (!plateRequired()) {
+              <mat-hint>Optional (Pflicht erst > {{ MAX_SPEED_PLATE_THRESHOLD_KMH }} km/h)</mat-hint>
             }
           </mat-form-field>
           <mat-form-field appearance="outline">
@@ -74,15 +110,6 @@ import { FleetService } from '../fleet.service';
             <input matInput formControlName="internal_name" />
           </mat-form-field>
           <mat-form-field appearance="outline">
-            <mat-label>Fahrzeugtyp</mat-label>
-            <mat-select formControlName="type">
-              <mat-option value="">– Kein Typ –</mat-option>
-              @for (c of categories; track c) {
-                <mat-option [value]="c">{{ categoryLabels[c] }}</mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
-          <mat-form-field appearance="outline">
             <mat-label>Zuordnung</mat-label>
             <mat-select formControlName="customer_id">
               <mat-option [value]="null">Eigener Fuhrpark</mat-option>
@@ -91,28 +118,40 @@ import { FleetService } from '../fleet.service';
               }
             </mat-select>
           </mat-form-field>
-          <mat-checkbox formControlName="is_faster_than_40kmh">
-            Fahrzeug schneller als 40 km/h (HU-Intervall 1 Jahr statt 2 Jahre)
-          </mat-checkbox>
-          <div>
+          <div class="step-actions">
+            <button matButton matStepperPrevious type="button">Zurück</button>
             <button matButton="filled" matStepperNext type="button">Weiter</button>
           </div>
         </form>
       </mat-step>
 
-      <!-- Schritt 2: Technik & HU -->
+      <!-- Schritt 3: Technik & HU -->
       <mat-step [stepControl]="techForm" label="Technik & HU">
         <form [formGroup]="techForm" class="step-form">
-          <mat-form-field appearance="outline">
-            <mat-label>Betriebsstunden</mat-label>
-            <input matInput type="number" min="0" formControlName="operating_hours" />
-            <span matTextSuffix>h</span>
-          </mat-form-field>
-          <mat-form-field appearance="outline">
-            <mat-label>Kilometerstand</mat-label>
-            <input matInput type="number" min="0" formControlName="mileage" />
-            <span matTextSuffix>km</span>
-          </mat-form-field>
+          @if (rules().requiresOperatingHours) {
+            <mat-form-field appearance="outline">
+              <mat-label>Betriebsstunden</mat-label>
+              <input matInput type="number" min="0" formControlName="operating_hours" />
+              <span matTextSuffix>h</span>
+            </mat-form-field>
+          }
+          @if (rules().requiresMileage) {
+            <mat-form-field appearance="outline">
+              <mat-label>Kilometerstand</mat-label>
+              <input matInput type="number" min="0" formControlName="mileage" />
+              <span matTextSuffix>km</span>
+            </mat-form-field>
+          }
+          @if (rules().requiresMaxWeight) {
+            <mat-form-field appearance="outline">
+              <mat-label>Zulässiges Gesamtgewicht</mat-label>
+              <input matInput type="number" min="0" formControlName="max_weight_kg" />
+              <span matTextSuffix>kg</span>
+              @if (techForm.controls.max_weight_kg.hasError('required')) {
+                <mat-error>Gesamtgewicht ist erforderlich (bestimmt das HU-Intervall)</mat-error>
+              }
+            </mat-form-field>
+          }
           <mat-form-field appearance="outline">
             <mat-label>Baujahr</mat-label>
             <input matInput type="number" formControlName="construction_year" />
@@ -121,26 +160,43 @@ import { FleetService } from '../fleet.service';
             }
           </mat-form-field>
           <mat-form-field appearance="outline">
-            <mat-label>Letzte HU</mat-label>
-            <input matInput [matDatepicker]="tuvPicker" formControlName="tuv_date" />
-            <mat-datepicker-toggle matIconSuffix [for]="tuvPicker" />
-            <mat-datepicker #tuvPicker />
+            <mat-label>Erstzulassung</mat-label>
+            <input matInput [matDatepicker]="firstRegPicker" formControlName="first_registration" />
+            <mat-datepicker-toggle matIconSuffix [for]="firstRegPicker" />
+            <mat-datepicker #firstRegPicker />
+            @if (techForm.controls.first_registration.hasError('required')) {
+              <mat-error>Erstzulassung ist erforderlich (bestimmt die Neuwagen-Regel)</mat-error>
+            }
           </mat-form-field>
-          <mat-form-field appearance="outline">
-            <mat-label>Letzte UVV-Prüfung</mat-label>
-            <input matInput [matDatepicker]="uvvPicker" formControlName="uvv_date" />
-            <mat-datepicker-toggle matIconSuffix [for]="uvvPicker" />
-            <mat-datepicker #uvvPicker />
-          </mat-form-field>
-          <mat-form-field appearance="outline">
-            <mat-label>Kraftstoff</mat-label>
-            <mat-select formControlName="fuel_type">
-              <mat-option [value]="null">–</mat-option>
-              @for (ft of fuelTypes; track ft) {
-                <mat-option [value]="ft">{{ fuelTypeLabels[ft] }}</mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
+          @if (rules().huApplicable) {
+            <mat-form-field appearance="outline">
+              <mat-label>Letzte HU</mat-label>
+              <input matInput [matDatepicker]="tuvPicker" formControlName="tuv_date" />
+              <mat-datepicker-toggle matIconSuffix [for]="tuvPicker" />
+              <mat-datepicker #tuvPicker />
+              <mat-hint>Intervall: {{ huIntervalLabel() }}</mat-hint>
+            </mat-form-field>
+          }
+          @if (rules().uvvApplicable) {
+            <mat-form-field appearance="outline">
+              <mat-label>Letzte UVV-Prüfung</mat-label>
+              <input matInput [matDatepicker]="uvvPicker" formControlName="uvv_date" />
+              <mat-datepicker-toggle matIconSuffix [for]="uvvPicker" />
+              <mat-datepicker #uvvPicker />
+              <mat-hint>Intervall: 1 Jahr</mat-hint>
+            </mat-form-field>
+          }
+          @if (rules().requiresFuelType) {
+            <mat-form-field appearance="outline">
+              <mat-label>Kraftstoff</mat-label>
+              <mat-select formControlName="fuel_type">
+                <mat-option [value]="null">–</mat-option>
+                @for (ft of fuelTypes; track ft) {
+                  <mat-option [value]="ft">{{ fuelTypeLabels[ft] }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          }
           <mat-form-field appearance="outline">
             <mat-label>FIN (VIN)</mat-label>
             <input matInput formControlName="vin" />
@@ -152,7 +208,7 @@ import { FleetService } from '../fleet.service';
         </form>
       </mat-step>
 
-      <!-- Schritt 3: Sonstiges -->
+      <!-- Schritt 4: Sonstiges -->
       <mat-step label="Sonstiges">
         <form [formGroup]="miscForm" class="step-form">
           <mat-form-field appearance="outline">
@@ -171,7 +227,11 @@ import { FleetService } from '../fleet.service';
           </mat-form-field>
           <div class="step-actions">
             <button matButton matStepperPrevious type="button">Zurück</button>
-            <button matButton="filled" (click)="save()" [disabled]="saving() || baseForm.invalid || techForm.invalid">
+            <button
+              matButton="filled"
+              (click)="save()"
+              [disabled]="saving() || typeForm.invalid || baseForm.invalid || techForm.invalid"
+            >
               <mat-icon>save</mat-icon>
               Speichern
             </button>
@@ -188,7 +248,6 @@ import { FleetService } from '../fleet.service';
       padding: 12px 0;
       max-width: 800px;
     }
-    .step-form > mat-checkbox,
     .step-form > div,
     .notes {
       grid-column: 1 / -1;
@@ -211,6 +270,7 @@ export class VehicleFormComponent implements HasUnsavedChanges {
   readonly vehicleId = computed(() => this.id() ?? null);
 
   readonly maxYear = new Date().getFullYear() + 1;
+  readonly MAX_SPEED_PLATE_THRESHOLD_KMH = MAX_SPEED_PLATE_THRESHOLD_KMH;
   readonly fuelTypes = Object.keys(FUEL_TYPE_LABELS) as FuelType[];
   readonly fuelTypeLabels = FUEL_TYPE_LABELS;
   readonly categories = VEHICLE_CATEGORIES;
@@ -219,23 +279,28 @@ export class VehicleFormComponent implements HasUnsavedChanges {
   /** Nach erfolgreichem Speichern true — unterdrückt die Verwerfen-Rückfrage. */
   private readonly saved = signal(false);
 
+  readonly typeForm = this.fb.nonNullable.group({
+    type: [''],
+  });
+
   readonly baseForm = this.fb.nonNullable.group({
-    plate: ['', [Validators.required, Validators.pattern(LICENSE_PLATE_PATTERN)]],
+    max_speed_kmh: [null as number | null, Validators.min(0)],
+    plate: ['', [Validators.pattern(LICENSE_PLATE_PATTERN)]],
     make: ['', Validators.required],
     model: ['', Validators.required],
     internal_name: [''],
-    type: [''],
     customer_id: [null as string | null],
-    is_faster_than_40kmh: [true],
   });
 
   readonly techForm = this.fb.group({
     operating_hours: [null as number | null, Validators.min(0)],
     mileage: [null as number | null, Validators.min(0)],
+    max_weight_kg: [null as number | null, Validators.min(0)],
     construction_year: [
       null as number | null,
       [Validators.min(1900), Validators.max(this.maxYear)],
     ],
+    first_registration: [null as Date | null],
     tuv_date: [null as Date | null],
     uvv_date: [null as Date | null],
     fuel_type: [null as FuelType | null],
@@ -248,16 +313,62 @@ export class VehicleFormComponent implements HasUnsavedChanges {
     notes: [''],
   });
 
+  private readonly typeValue = toSignal(this.typeForm.controls.type.valueChanges, {
+    initialValue: this.typeForm.controls.type.value,
+  });
+  readonly category = computed<VehicleCategory>(() => (this.typeValue() || 'sonstiges') as VehicleCategory);
+  readonly rules = computed(() => VEHICLE_CATEGORY_RULES[this.category()]);
+
+  private readonly firstRegistrationValue = toSignal(this.techForm.controls.first_registration.valueChanges, {
+    initialValue: this.techForm.controls.first_registration.value,
+  });
+  private readonly maxWeightValue = toSignal(this.techForm.controls.max_weight_kg.valueChanges, {
+    initialValue: this.techForm.controls.max_weight_kg.value,
+  });
+  private readonly maxSpeedValue = toSignal(this.baseForm.controls.max_speed_kmh.valueChanges, {
+    initialValue: this.baseForm.controls.max_speed_kmh.value,
+  });
+  readonly plateRequired = computed(() => requiresPlate(this.category(), this.maxSpeedValue()));
+
+  readonly huIntervalMonths = computed(() =>
+    effectiveHuIntervalMonths(this.category(), this.firstRegistrationValue(), this.maxWeightValue()),
+  );
+  readonly huIntervalLabel = computed(() => {
+    const months = this.huIntervalMonths();
+    if (months == null) return 'keine HU-Pflicht';
+    return months % 12 === 0 ? `${months / 12} Jahr(e)` : `${months} Monate`;
+  });
+
   constructor() {
     void this.customers.load();
-    void this.loadExisting();
+    effect(() => {
+      const id = this.vehicleId();
+      if (id) {
+        void this.loadExisting(id);
+      }
+    });
+    effect(() => {
+      const rules = this.rules();
+      setRequired(this.techForm.controls.operating_hours, rules.requiresOperatingHours, [Validators.min(0)]);
+      setRequired(this.techForm.controls.mileage, rules.requiresMileage, [Validators.min(0)]);
+      setRequired(this.techForm.controls.max_weight_kg, rules.requiresMaxWeight, [Validators.min(0)]);
+      setRequired(this.baseForm.controls.max_speed_kmh, rules.requiresMaxSpeed, [Validators.min(0)]);
+      setRequired(this.techForm.controls.tuv_date, rules.huApplicable);
+      setRequired(this.techForm.controls.uvv_date, rules.uvvApplicable);
+      setRequired(this.techForm.controls.first_registration, rules.huNewVehicleBonus);
+    });
+    effect(() => {
+      setRequired(this.baseForm.controls.plate, this.plateRequired(), [Validators.pattern(LICENSE_PLATE_PATTERN)]);
+    });
+    this.baseForm.controls.plate.valueChanges.pipe(takeUntilDestroyed()).subscribe((value) => {
+      const upper = value.toUpperCase();
+      if (upper !== value) {
+        this.baseForm.controls.plate.setValue(upper, { emitEvent: false });
+      }
+    });
   }
 
-  private async loadExisting(): Promise<void> {
-    const id = this.vehicleId();
-    if (!id) {
-      return;
-    }
+  private async loadExisting(id: string): Promise<void> {
     if (this.fleet.vehicles().length === 0) {
       await this.fleet.load();
     }
@@ -265,19 +376,23 @@ export class VehicleFormComponent implements HasUnsavedChanges {
     if (!v) {
       return;
     }
+    this.typeForm.patchValue({
+      type: v.type ?? '',
+    });
     this.baseForm.patchValue({
-      plate: v.plate,
+      max_speed_kmh: v.max_speed_kmh,
+      plate: v.plate ?? '',
       make: v.make,
       model: v.model,
       internal_name: v.internal_name ?? '',
-      type: v.type ?? '',
       customer_id: v.customer_id,
-      is_faster_than_40kmh: v.is_faster_than_40kmh,
     });
     this.techForm.patchValue({
       operating_hours: v.operating_hours,
       mileage: v.mileage,
+      max_weight_kg: v.max_weight_kg,
       construction_year: v.construction_year,
+      first_registration: v.first_registration ? new Date(v.first_registration) : null,
       tuv_date: v.tuv_date ? new Date(v.tuv_date) : null,
       uvv_date: v.uvv_date ? new Date(v.uvv_date) : null,
       fuel_type: v.fuel_type,
@@ -291,25 +406,28 @@ export class VehicleFormComponent implements HasUnsavedChanges {
   }
 
   async save(): Promise<void> {
-    if (this.baseForm.invalid || this.techForm.invalid || this.saving()) {
+    if (this.typeForm.invalid || this.baseForm.invalid || this.techForm.invalid || this.saving()) {
       return;
     }
     this.saving.set(true);
+    const typeVal = this.typeForm.getRawValue();
     const base = this.baseForm.getRawValue();
     const tech = this.techForm.getRawValue();
     const misc = this.miscForm.getRawValue();
     const toIsoDate = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
     const payload: Partial<VehicleInsert> = {
-      plate: base.plate.trim().toUpperCase(),
+      plate: base.plate.trim().toUpperCase() || null,
       make: base.make.trim(),
       model: base.model.trim(),
       internal_name: base.internal_name.trim() || null,
-      type: base.type || null,
+      type: typeVal.type || null,
       customer_id: base.customer_id,
-      is_faster_than_40kmh: base.is_faster_than_40kmh,
+      max_speed_kmh: base.max_speed_kmh,
       operating_hours: tech.operating_hours,
       mileage: tech.mileage,
+      max_weight_kg: tech.max_weight_kg,
       construction_year: tech.construction_year,
+      first_registration: toIsoDate(tech.first_registration),
       tuv_date: toIsoDate(tech.tuv_date),
       uvv_date: toIsoDate(tech.uvv_date),
       fuel_type: tech.fuel_type,
@@ -340,7 +458,12 @@ export class VehicleFormComponent implements HasUnsavedChanges {
   hasUnsavedChanges(): boolean {
     return (
       !this.saved() &&
-      (this.baseForm.dirty || this.techForm.dirty || this.miscForm.dirty)
+      (this.typeForm.dirty || this.baseForm.dirty || this.techForm.dirty || this.miscForm.dirty)
     );
   }
+}
+
+function setRequired(control: AbstractControl, required: boolean, extra: ValidatorFn[] = []): void {
+  control.setValidators(required ? [Validators.required, ...extra] : extra);
+  control.updateValueAndValidity({ emitEvent: false });
 }
