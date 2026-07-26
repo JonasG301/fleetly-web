@@ -17,7 +17,8 @@ jobs:
           echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
           sudo apt-get update
           sudo apt-get install -y postgresql-client-17
-          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+          ls -la /usr/lib/postgresql/17/bin/pg_dump
+          /usr/lib/postgresql/17/bin/pg_dump --version
 
       - name: rclone installieren
         run: curl https://rclone.org/install.sh | sudo bash
@@ -26,7 +27,7 @@ jobs:
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
-          pg_dump "$SUPABASE_DB_URL" --format=custom --file="db-$(date +%F).dump"
+          /usr/lib/postgresql/17/bin/pg_dump "$SUPABASE_DB_URL" --format=custom --file="db-$(date +%F).dump"
 
       - name: DB-Dump zu Backblaze B2 hochladen
         env:
