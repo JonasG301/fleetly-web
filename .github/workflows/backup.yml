@@ -1,0 +1,53 @@
+name: Backup DB & Storage
+
+on:
+  schedule:
+    # täglich um 03:00 UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: PostgreSQL-Client installieren
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: rclone installieren
+        run: curl https://rclone.org/install.sh | sudo bash
+
+      - name: DB-Dump erstellen
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          pg_dump "$SUPABASE_DB_URL" --format=custom --file="db-$(date +%F).dump"
+
+      - name: DB-Dump zu Backblaze B2 hochladen
+        env:
+          RCLONE_CONFIG_B2_TYPE: b2
+          RCLONE_CONFIG_B2_ACCOUNT: ${{ secrets.B2_ACCOUNT_ID }}
+          RCLONE_CONFIG_B2_KEY: ${{ secrets.B2_APPLICATION_KEY }}
+        run: |
+          rclone copy "db-$(date +%F).dump" "b2:${{ secrets.B2_BUCKET }}/db/"
+
+      - name: Alte DB-Dumps aufräumen (>30 Tage)
+        env:
+          RCLONE_CONFIG_B2_TYPE: b2
+          RCLONE_CONFIG_B2_ACCOUNT: ${{ secrets.B2_ACCOUNT_ID }}
+          RCLONE_CONFIG_B2_KEY: ${{ secrets.B2_APPLICATION_KEY }}
+        run: |
+          rclone delete "b2:${{ secrets.B2_BUCKET }}/db/" --min-age 30d
+
+      - name: Storage-Bucket inkrementell zu Backblaze B2 syncen
+        env:
+          RCLONE_CONFIG_SUPABASE_TYPE: s3
+          RCLONE_CONFIG_SUPABASE_PROVIDER: Other
+          RCLONE_CONFIG_SUPABASE_ACCESS_KEY_ID: ${{ secrets.SUPABASE_S3_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_SUPABASE_SECRET_ACCESS_KEY: ${{ secrets.SUPABASE_S3_SECRET_ACCESS_KEY }}
+          RCLONE_CONFIG_SUPABASE_ENDPOINT: ${{ secrets.SUPABASE_S3_ENDPOINT }}
+          RCLONE_CONFIG_SUPABASE_REGION: us-east-1
+          RCLONE_CONFIG_B2_TYPE: b2
+          RCLONE_CONFIG_B2_ACCOUNT: ${{ secrets.B2_ACCOUNT_ID }}
+          RCLONE_CONFIG_B2_KEY: ${{ secrets.B2_APPLICATION_KEY }}
+        run: |
+          rclone sync "supabase:damage-photos" "b2:${{ secrets.B2_BUCKET }}/storage/damage-photos" --fast-list
